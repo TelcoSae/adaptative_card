@@ -1,0 +1,418 @@
+={
+  "createdAt": "2025-09-23T16:17:43.812Z",
+  "updatedAt": "2025-09-23T19:06:21.000Z",
+  "id": "OcUS4CVAS2YipS1F",
+  "name": "Doble apertura - Prod",
+  "active": false,
+  "isArchived": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -352,
+        -224
+      ],
+      "id": "cf6002b1-af8d-4b36-861e-3f5831192d22",
+      "name": "Schedule Trigger",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO Eventos.DobleApertura (\n  IdAfectacion, Anillo, Equipos, Servicios, Clientes, Horario\n)\nVALUES (\n  '{{ $json.IdAfectacion }}',\n  '{{ $json.Anillo }}',\n  '{{ $json.Equipos }}',\n  {{ $json.Servicios }},\n  {{ $json.Clientes }},\n  '{{ $json.Horario }}'\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        672,
+        -480
+      ],
+      "id": "ed0d78b2-b7e1-41bf-a222-b3915815cf72",
+      "name": "Eventos.DobleApertura Insert",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL Eventos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT 'DA_TEST' as Origen, Anillo, Equipos, Servicios, Clientes, Horario FROM Eventos.DA_TEST;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -128,
+        -224
+      ],
+      "id": "3832c2b1-1dec-4178-bac0-43929abb8188",
+      "name": "DA_TEST",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL Eventos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT 'DobleApertura' as Origen, Anillo, Equipos, Servicios, Clientes, Horario\nFROM Eventos.DobleApertura \nWHERE HorarioFin IS NULL;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -128,
+        -32
+      ],
+      "id": "78ec3f9e-9e07-47ec-8532-e7b9845b9944",
+      "name": "DobleApertura",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL Eventos"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        80,
+        -208
+      ],
+      "id": "58eec685-74af-454d-8243-65d0e6d24b1a",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\n\n// Separamos según el campo Origen\nconst daTest = items.filter(ev => ev.Origen === 'DA_TEST');\nconst dobleApertura = items.filter(ev => ev.Origen === 'DobleApertura');\n\n// Generar clave única\nfunction makeKey(ev) {\n  return `${ev.Anillo}|${ev.Equipos}|${ev.Servicios}|${ev.Clientes}|${ev.Horario}`;\n}\n\n// Generar UUID v4\nfunction uuidv4() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = (Math.random() * 16) | 0;\n    const v = c === 'x' ? r : (r & 0x3) | 0x8;\n    return v.toString(16);\n  });\n}\n\nconst mapDA = new Map(daTest.map(ev => [makeKey(ev), ev]));\nconst mapDApertura = new Map(dobleApertura.map(ev => [makeKey(ev), ev]));\n\nconst salida = [];\n\n// Clasificamos Nuevo y Existe\nfor (const [key, ev] of mapDA.entries()) {\n  if (mapDApertura.has(key)) {\n    salida.push({ json: { ...ev, Estado: \"Existe\" } });\n  } else {\n    salida.push({ json: { ...ev, Estado: \"Nuevo\", IdAfectacion: uuidv4() } });\n  }\n}\n\n// Clasificamos Cerrar\nfor (const [key, ev] of mapDApertura.entries()) {\n  if (!mapDA.has(key)) {\n    salida.push({ json: { ...ev, Estado: \"Cerrar\" } });\n  }\n}\n\nreturn salida;\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        -208
+      ],
+      "id": "e99252fa-9d10-4644-8fa3-d3b26ea2fdbb",
+      "name": "Clasificador"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.Estado }}",
+                    "rightValue": "Nuevo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "21e3cf2f-49af-40f6-87dc-10710d3581e3"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Nuevo"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        432,
+        -208
+      ],
+      "id": "9a612f11-761e-4b48-b517-96e4d07acefb",
+      "name": "Derivador"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst derivador = $items(\"Derivador\");\nconst daAfecta = $items(\"Consulta DA_AFECTA\");\n\n\nconst resultado = daAfecta.map(da => {\n  const match = derivador.find(d => d.json.Anillo === da.json.sysLocation);\n\n  return {\n    json: {\n      sysName: da.json.sysName,\n      sysLocation: da.json.sysLocation,\n      enlace: da.json.enlace,\n      Cliente: da.json.Cliente,\n      Producto: da.json.Producto,\n      \"Estado VTV\": da.json[\"Estado VTV\"],\n      Critico: da.json.Critico,\n      IdAfectacion: match ? match.json.IdAfectacion : null\n    }\n  };\n});\n\nreturn resultado;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -208
+      ],
+      "id": "7e3bf3ce-b84a-458b-9776-4a4d53902707",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT sysName, sysLocation, enlace, Cliente, Producto, `Estado VTV`, Critico\nFROM DA_AFECTA\nWHERE sysLocation = '{{ $json.Anillo }}'\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        688,
+        -304
+      ],
+      "id": "c05f907b-5ae4-4c3f-931e-73553c3c26f4",
+      "name": "Consulta DA_AFECTA",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL Eventos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "value": "Afectacion",
+          "mode": "list",
+          "cachedResultName": "Afectacion"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1088,
+        -208
+      ],
+      "id": "ff381bef-0c15-4efd-bdd7-047698827ee6",
+      "name": "Insert Afectacion",
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL Eventos"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "DA_TEST",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "DobleApertura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DA_TEST": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DobleApertura": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Clasificador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificador": {
+      "main": [
+        [
+          {
+            "node": "Derivador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Derivador": {
+      "main": [
+        [
+          {
+            "node": "Eventos.DobleApertura Insert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Consulta DA_AFECTA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        []
+      ]
+    },
+    "Consulta DA_AFECTA": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Insert Afectacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "64143d60-68d1-497c-a239-be75f6d5f7a0",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "createdAt": "2025-09-23T16:17:43.816Z",
+      "updatedAt": "2025-09-23T16:17:43.816Z",
+      "role": "workflow:owner",
+      "workflowId": "OcUS4CVAS2YipS1F",
+      "projectId": "QdIaKjwyS02MMGZQ",
+      "project": {
+        "createdAt": "2025-09-11T18:03:44.820Z",
+        "updatedAt": "2025-09-11T18:10:14.443Z",
+        "id": "QdIaKjwyS02MMGZQ",
+        "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-09-11T18:03:44.820Z",
+            "updatedAt": "2025-09-11T18:03:44.820Z",
+            "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
+            "projectId": "QdIaKjwyS02MMGZQ",
+            "user": {
+              "createdAt": "2025-09-11T18:03:44.372Z",
+              "updatedAt": "2025-10-08T10:41:47.000Z",
+              "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
+              "email": "saf.empresas@claro.com.ar",
+              "firstName": "Soporte Acceso Empresas",
+              "lastName": " Empresas",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-11T18:11:25.739Z",
+                "personalization_survey_n8n_version": "1.110.1",
+                "automationGoalDevops": [
+                  "ticketing-systems-integrations"
+                ],
+                "companyIndustryExtended": [
+                  "telecoms"
+                ],
+                "companySize": "1000+",
+                "companyType": "other",
+                "role": "devops",
+                "reportedSource": "event"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "qNvPVx6pVl6SWob0",
+                "userActivatedAt": 1758135955025,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1759778484200
+                }
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-10-08",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": []
+}
