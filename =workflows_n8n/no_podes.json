@@ -1,0 +1,240 @@
+={
+  "createdAt": "2025-09-25T18:43:32.870Z",
+  "updatedAt": "2025-10-07T14:55:13.000Z",
+  "id": "xd6nWnJqp45P9bFT",
+  "name": "no podes",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "functionCode": "const keywords = ['status','actualización','avance','novedad','novedades'];\nconst message = $json['body']?.toLowerCase() || '';\nconst regex = /INC\\d{12}/;\nconst match = message.match(regex);\nif(match && keywords.some(k => message.includes(k))){\n  return [{json:{incNumber: match[0]}}];\n}\nreturn [];"
+      },
+      "name": "Extract INC",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        256,
+        0
+      ],
+      "id": "ce913988-e350-43c3-b6b3-8d8ba9a9659e"
+    },
+    {
+      "parameters": {
+        "url": "https://apiqa.sae.claro.amx/remedy/incidente/notas/{{$json[\"incNumber\"]}}",
+        "jsonParameters": true,
+        "options": {}
+      },
+      "name": "Get BMC Notes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        512,
+        0
+      ],
+      "id": "d8920ce5-fe99-4518-8567-dc395696f074"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Filtrar notas relevantes y ordenar\nlet notes = $json.filter(n => n['Work Log Type'] === 'General Information');\nnotes.sort((a,b) => new Date(a['Submit Date']) - new Date(b['Submit Date']));\n\n// Última nota\nconst lastNote = notes[notes.length - 1] || {};\n\n// Concatenar todo para IA\nconst textForAI = notes.map(n => `${n['Submit Date']}: ${n['Detailed Description']}`).join('\\n\\n');\n\nreturn [{json:{textForAI, lastNote}}];"
+      },
+      "name": "Prepare Text for AI",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        752,
+        0
+      ],
+      "id": "dfd5b5ad-d2a4-4324-a7ad-b08d13b6d109"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4",
+        "prompt": "Eres un asistente técnico que resume tickets de soporte.\nGenera un resumen en formato bullet points con máximo 3 líneas por sección, enfocado en:\n- Estado actual del ticket\n- Última acción registrada\n- Próximos pasos o bloqueos\nNo incluyas información irrelevante.\n\nÚltima nota: {{$json[\"lastNote\"][\"Detailed Description\"]}}\nTodas las notas:\n{{$json[\"textForAI\"]}}",
+        "options": {},
+        "requestOptions": {}
+      },
+      "name": "Summarize with AI - Bullet Points",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        0
+      ],
+      "id": "c015be88-b0b7-4195-85e3-a9912ba32c7f",
+      "credentials": {
+        "openAiApi": {
+          "id": "JnjeUyLQ04m9dNZx",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "3dca384f-5b68-4b6a-b775-85049e0d88ec",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        16,
+        0
+      ],
+      "id": "bf80572c-f370-4cf1-ba4d-739cf5b0c887",
+      "name": "Webhook",
+      "webhookId": "3dca384f-5b68-4b6a-b775-85049e0d88ec"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://f3da3763bda6e539974bcb2bd9bcbe.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/3b767676fd8c4762b53019fb635dcea2/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=FkA9dq1ZIizefC32Cf_PdaQH-t1Z3Vxoko7tHEV23tg",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1216,
+        0
+      ],
+      "id": "610086ab-21de-4c4e-9414-f6c0f603a92a",
+      "name": "HTTP Request"
+    }
+  ],
+  "connections": {
+    "Extract INC": {
+      "main": [
+        [
+          {
+            "node": "Get BMC Notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get BMC Notes": {
+      "main": [
+        [
+          {
+            "node": "Prepare Text for AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Text for AI": {
+      "main": [
+        [
+          {
+            "node": "Summarize with AI - Bullet Points",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize with AI - Bullet Points": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract INC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "67ec4e2d-a2a1-446f-bcd2-556d0fdc0f1a",
+  "triggerCount": 0,
+  "shared": [
+    {
+      "createdAt": "2025-09-25T18:43:32.874Z",
+      "updatedAt": "2025-09-25T18:43:32.874Z",
+      "role": "workflow:owner",
+      "workflowId": "xd6nWnJqp45P9bFT",
+      "projectId": "QdIaKjwyS02MMGZQ",
+      "project": {
+        "createdAt": "2025-09-11T18:03:44.820Z",
+        "updatedAt": "2025-09-11T18:10:14.443Z",
+        "id": "QdIaKjwyS02MMGZQ",
+        "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-09-11T18:03:44.820Z",
+            "updatedAt": "2025-09-11T18:03:44.820Z",
+            "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
+            "projectId": "QdIaKjwyS02MMGZQ",
+            "user": {
+              "createdAt": "2025-09-11T18:03:44.372Z",
+              "updatedAt": "2025-10-08T10:41:47.000Z",
+              "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
+              "email": "saf.empresas@claro.com.ar",
+              "firstName": "Soporte Acceso Empresas",
+              "lastName": " Empresas",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-11T18:11:25.739Z",
+                "personalization_survey_n8n_version": "1.110.1",
+                "automationGoalDevops": [
+                  "ticketing-systems-integrations"
+                ],
+                "companyIndustryExtended": [
+                  "telecoms"
+                ],
+                "companySize": "1000+",
+                "companyType": "other",
+                "role": "devops",
+                "reportedSource": "event"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "qNvPVx6pVl6SWob0",
+                "userActivatedAt": 1758135955025,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1759778484200
+                }
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-10-08",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": []
+}
