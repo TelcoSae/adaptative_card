@@ -1,0 +1,192 @@
+={
+  "createdAt": "2025-09-25T18:43:32.870Z",
+  "updatedAt": "2025-10-14T20:20:53.000Z",
+  "id": "xd6nWnJqp45P9bFT",
+  "name": "no podes",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://apiqa.sae.claro.amx/remedy/incidente/notas/INC000055796230",
+        "jsonParameters": true,
+        "options": {}
+      },
+      "name": "Get BMC Notes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        240,
+        240
+      ],
+      "id": "d8920ce5-fe99-4518-8567-dc395696f074"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Filtrar notas relevantes y ordenar\nlet notes = $json.filter(n => n['Work Log Type'] === 'General Information');\nnotes.sort((a,b) => new Date(a['Submit Date']) - new Date(b['Submit Date']));\n\n// Última nota\nconst lastNote = notes[notes.length - 1] || {};\n\n// Concatenar todo para IA\nconst textForAI = notes.map(n => `${n['Submit Date']}: ${n['Detailed Description']}`).join('\\n\\n');\n\nreturn [{json:{textForAI, lastNote}}];"
+      },
+      "name": "Prepare Text for AI",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        528,
+        240
+      ],
+      "id": "dfd5b5ad-d2a4-4324-a7ad-b08d13b6d109"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        736,
+        240
+      ],
+      "id": "e0e4e6ff-4be2-447e-bb11-ee9b1fd801fd",
+      "name": "When chat message received",
+      "webhookId": "e26fb408-8f2a-45d2-8654-6bdd85cef354"
+    },
+    {
+      "parameters": {
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        944,
+        240
+      ],
+      "id": "9d1e310c-2630-41c7-80a9-ecfd2af6e49b",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        880,
+        448
+      ],
+      "id": "7b559455-4af5-4c50-9b0f-8e0dbd88526f",
+      "name": "Ollama Chat Model"
+    }
+  ],
+  "connections": {
+    "Get BMC Notes": {
+      "main": [
+        [
+          {
+            "node": "Prepare Text for AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Text for AI": {
+      "main": [
+        []
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "3ee9b60a-a5ef-433f-a84b-d675afbf7f72",
+  "triggerCount": 0,
+  "shared": [
+    {
+      "createdAt": "2025-09-25T18:43:32.874Z",
+      "updatedAt": "2025-09-25T18:43:32.874Z",
+      "role": "workflow:owner",
+      "workflowId": "xd6nWnJqp45P9bFT",
+      "projectId": "QdIaKjwyS02MMGZQ",
+      "project": {
+        "createdAt": "2025-09-11T18:03:44.820Z",
+        "updatedAt": "2025-09-11T18:10:14.443Z",
+        "id": "QdIaKjwyS02MMGZQ",
+        "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-09-11T18:03:44.820Z",
+            "updatedAt": "2025-09-11T18:03:44.820Z",
+            "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
+            "projectId": "QdIaKjwyS02MMGZQ",
+            "user": {
+              "createdAt": "2025-09-11T18:03:44.372Z",
+              "updatedAt": "2025-10-21T09:00:53.000Z",
+              "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
+              "email": "saf.empresas@claro.com.ar",
+              "firstName": "Soporte Acceso Empresas",
+              "lastName": " Empresas",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-11T18:11:25.739Z",
+                "personalization_survey_n8n_version": "1.110.1",
+                "automationGoalDevops": [
+                  "ticketing-systems-integrations"
+                ],
+                "companyIndustryExtended": [
+                  "telecoms"
+                ],
+                "companySize": "1000+",
+                "companyType": "other",
+                "role": "devops",
+                "reportedSource": "event"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "qNvPVx6pVl6SWob0",
+                "userActivatedAt": 1758135955025,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1759778484200
+                },
+                "easyAIWorkflowOnboarded": true
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-10-21",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": []
+}
