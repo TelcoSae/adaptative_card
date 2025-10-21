@@ -1,0 +1,305 @@
+={
+  "createdAt": "2025-10-01T19:33:05.441Z",
+  "updatedAt": "2025-10-15T19:10:42.000Z",
+  "id": "T2pLioa05iAiyTz8",
+  "name": "Identificador de Bypass",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Este código corre en el nodo Code de N8N\nconst resultados = [];\n\nfor (const item of items) {\n  const syslocation = item.json.syslocation;\n  const alarmas = item.json.alarmas || [];\n\n  // Extraer sysnames únicos dentro del syslocation\n  const sysnamesUnicos = [...new Set(alarmas.map(a => a.sysname))];\n\n  // --- Condición nueva: más de un sysname en el mismo syslocation ---\n  if (sysnamesUnicos.length > 1) {\n    resultados.push({\n      json: {\n        origen: \"clasificador\",\n        syslocation,\n        resultado: \"Descartado\",\n        motivo: \"Más de un sysname en el syslocation\",\n        equipos: [],          // vaciamos equipos\n        nodeDowns: [],        // descartamos\n        interfaceDowns: []    // descartamos\n      }\n    });\n    continue; // saltamos al siguiente syslocation\n  }\n\n  // Precalcular tiempos en ms para no repetir new Date()\n  const nodeDowns = alarmas\n    .filter(a => a.alarmtype === \"NodeDown\")\n    .map(a => ({ ...a, time: new Date(a.created).getTime() }));\n\n  const interfaceDowns = alarmas\n    .filter(a => a.alarmtype === \"InterfaceDown\")\n    .map(a => ({ ...a, time: new Date(a.created).getTime() }));\n\n  let resultado = \"Apertura Simple\";\n\n  if (nodeDowns.length > 0) {\n    const hayInterfaceCercana = nodeDowns.some(nd =>\n      interfaceDowns.some(id =>\n        Math.abs(nd.time - id.time) / 60000 <= 10\n      )\n    );\n\n    resultado = hayInterfaceCercana ? \"Sin Bypass\" : \"Con Bypass\";\n  }\n\n  resultados.push({\n    json: {\n      origen: \"clasificador\",   // Marca de origen\n      syslocation,\n      resultado,\n      equipos: alarmas.map(a => a.sysname),\n      nodeDowns,\n      interfaceDowns\n    }\n  });\n}\n\nreturn resultados;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        -16
+      ],
+      "id": "4be6092e-9e08-4834-9b8e-4eb778ae3236",
+      "name": "Clasificador"
+    },
+    {
+      "parameters": {
+        "jsCode": "const agrupado = {};\n\nfor (const item of items) {\n  const loc = item.json.syslocation;\n  if (!agrupado[loc]) {\n    agrupado[loc] = [];\n  }\n  agrupado[loc].push({\n    alarmtype: item.json.alarmtype,\n    created: new Date(item.json.created),\n    updated: new Date(item.json.updated),\n    sysname: item.json.sysname\n  });\n}\n\nreturn Object.entries(agrupado).map(([syslocation, alarmas]) => {\n  return {\n    json: {\n      syslocation,\n      alarmas\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -16
+      ],
+      "id": "15fe3f74-6481-4d21-86b0-184d8eecee46",
+      "name": "Agrupar por Anillo"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -64,
+        -256
+      ],
+      "id": "1f4b5aea-2109-465c-a059-29a054f8e716",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        832,
+        -32
+      ],
+      "id": "8a6ff3ff-969d-4d37-8945-94c2d5725806",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bypass_metro (syslocation, sysname, bypass)\nVALUES ('{{ $json.syslocation }}', '{{ $json.sysname }}', '{{ $json.bypass }}')\nON DUPLICATE KEY UPDATE\nbypass = VALUES(bypass);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1280,
+        -32
+      ],
+      "id": "15fcd3b3-28c6-4cdd-b7bb-b859292c72bd",
+      "name": "bypass_metro escritura",
+      "credentials": {
+        "mySql": {
+          "id": "ptMDph8au7xSwRzr",
+          "name": "MySQL datos_red"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  \"bypass_metro\" as origen,\n  syslocation,\n  sysname,\n  bypass\n  FROM bypass_metro",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        496,
+        -256
+      ],
+      "id": "8b6246be-e405-45a7-bebd-61f9dd581150",
+      "name": "bypass_metro consulta",
+      "credentials": {
+        "mySql": {
+          "id": "ptMDph8au7xSwRzr",
+          "name": "MySQL datos_red"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  alm.alarmtype,\n  alm.created,\n  alm.updated,\n  nod.syslocation,\n  nod.sysname\nFROM NNMi.alarmas AS alm\nLEFT JOIN NNMi.nodos AS nod ON nod.uuid = alm.node_uuid\nWHERE alm.regional IN (\"nnmreg01\", \"nnmreg02\")\n  AND nod.syslocation IS NOT NULL\n  AND alm.created >= NOW() - INTERVAL 120 MINUTE\nORDER BY alm.created DESC",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        128,
+        -16
+      ],
+      "id": "a80c9c77-4a95-4298-afe2-27e76517e603",
+      "name": "NNMi consulta",
+      "credentials": {
+        "mySql": {
+          "id": "bPd34mauVIxhLee1",
+          "name": "MySQL NNMi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resultadosInsert = [];\nconst resultadosUpdate = [];\n\n// Separar por origen\nconst clasificadores = items.filter(i => i.json.origen === \"clasificador\");\nconst bypass = items.filter(i => i.json.origen === \"bypass_metro\");\n\n// Crear mapa de sysname → estado actual en la base\nconst estadoBypassActual = new Map();\nfor (const b of bypass) {\n  estadoBypassActual.set(b.json.sysname, b.json.bypass); // 'SI' o 'NO'\n}\n\n// Recorrer clasificadores\nfor (const c of clasificadores) {\n  const { syslocation, equipos, resultado } = c.json;\n  const estadoNuevo = resultado === \"Con Bypass\" ? \"SI\" : \"NO\";\n\n  for (const eq of equipos) {\n    const estadoExistente = estadoBypassActual.get(eq);\n\n    if (!estadoExistente) {\n      // No existe en la base → INSERT\n      resultadosInsert.push({\n        json: {\n          origen: \"comparador\",\n          syslocation,\n          sysname: eq,\n          bypass: estadoNuevo\n        }\n      });\n    } else if (estadoExistente !== estadoNuevo) {\n      // Existe pero cambió el estado → UPDATE\n      resultadosUpdate.push({\n        json: {\n          origen: \"comparador\",\n          syslocation,\n          sysname: eq,\n          bypass: estadoNuevo\n        }\n      });\n    }\n    // Si existe y no cambió, no hacemos nada\n  }\n}\n\n// Combinar ambos resultados\nreturn [...resultadosInsert, ...resultadosUpdate];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        -32
+      ],
+      "id": "860c0ff1-7f62-4fd9-8c66-424d34d93e38",
+      "name": "Valida existencia"
+    }
+  ],
+  "connections": {
+    "Agrupar por Anillo": {
+      "main": [
+        [
+          {
+            "node": "Clasificador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "NNMi consulta",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "bypass_metro consulta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificador": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Valida existencia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "bypass_metro consulta": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NNMi consulta": {
+      "main": [
+        [
+          {
+            "node": "Agrupar por Anillo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valida existencia": {
+      "main": [
+        [
+          {
+            "node": "bypass_metro escritura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "f5b588dc-56b1-4af9-a2fb-afb4b78b857d",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "createdAt": "2025-10-01T19:33:05.445Z",
+      "updatedAt": "2025-10-01T19:33:05.445Z",
+      "role": "workflow:owner",
+      "workflowId": "T2pLioa05iAiyTz8",
+      "projectId": "QdIaKjwyS02MMGZQ",
+      "project": {
+        "createdAt": "2025-09-11T18:03:44.820Z",
+        "updatedAt": "2025-09-11T18:10:14.443Z",
+        "id": "QdIaKjwyS02MMGZQ",
+        "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-09-11T18:03:44.820Z",
+            "updatedAt": "2025-09-11T18:03:44.820Z",
+            "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
+            "projectId": "QdIaKjwyS02MMGZQ",
+            "user": {
+              "createdAt": "2025-09-11T18:03:44.372Z",
+              "updatedAt": "2025-10-21T09:00:53.000Z",
+              "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
+              "email": "saf.empresas@claro.com.ar",
+              "firstName": "Soporte Acceso Empresas",
+              "lastName": " Empresas",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-11T18:11:25.739Z",
+                "personalization_survey_n8n_version": "1.110.1",
+                "automationGoalDevops": [
+                  "ticketing-systems-integrations"
+                ],
+                "companyIndustryExtended": [
+                  "telecoms"
+                ],
+                "companySize": "1000+",
+                "companyType": "other",
+                "role": "devops",
+                "reportedSource": "event"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "qNvPVx6pVl6SWob0",
+                "userActivatedAt": 1758135955025,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1759778484200
+                },
+                "easyAIWorkflowOnboarded": true
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-10-21",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": []
+}
