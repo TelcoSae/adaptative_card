@@ -1,0 +1,248 @@
+={
+  "createdAt": "2025-10-09T13:58:48.868Z",
+  "updatedAt": "2025-10-09T16:05:30.000Z",
+  "id": "uJkNS93cn6bq8ZoA",
+  "name": "My workflow 4",
+  "active": false,
+  "isArchived": true,
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.sae.claro.amx/misc/factibilidad",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -432,
+        -192
+      ],
+      "id": "030cfb65-6fbb-4212-aa70-b18819c3216e",
+      "name": "Uso de red"
+    },
+    {
+      "parameters": {
+        "path": "22fed3fd-2d15-4cda-8605-a245cdf64248",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -688,
+        -256
+      ],
+      "id": "5eb14f96-2434-420e-8e80-53674772c8eb",
+      "name": "Webhook",
+      "webhookId": "22fed3fd-2d15-4cda-8605-a245cdf64248"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.htmlContent }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        224,
+        -256
+      ],
+      "id": "2e198c8d-779b-45ae-8a71-2bb1be8a4fc9",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Procesar datos\nconst dataArray = items.map(item => item.json).filter(item => {\n  return item && (item.ID !== undefined || item.Equipo || item.Acronimo);\n});\n\n// Función para convertir bytes a Gb (gigabits)\nconst bytesToGb = (bytes) => bytes != null ? (bytes / 1e9).toFixed(2) + ' Gb' : '—';\n\n// Función para convertir Mbps a Gbps\nconst mbpsToGbps = (mbps) => mbps != null ? (mbps / 1000).toFixed(2) + ' Gbps' : '—';\n\nconst tableData = dataArray.map(item => ({\n  origen: item.origen || '—',\n  ID: item.ID != null ? String(item.ID) : '—',\n  Acronimo: item.Acronimo || '—',\n  Equipo: item.Equipo || '—',\n  Region_MST: item.Region_MST || '—',\n  bw: mbpsToGbps(item.bw),\n  traffic_1d: bytesToGb(item.traffic_1d),\n  traffic_7d: bytesToGb(item.traffic_7d),\n  traffic_30d: bytesToGb(item.traffic_30d),\n  last_update: item.last_update ? new Date(item.last_update).toLocaleString('es-ES') : '—',\n  fr_rpv_traffic: bytesToGb(item.fr_rpv_traffic),\n  fr_inet_traffic: bytesToGb(item.fr_inet_traffic),\n  fr_bw_rpv: mbpsToGbps(item.fr_bw_rpv),\n  fr_bw_inet: mbpsToGbps(item.fr_bw_inet),\n  fr_ipran_traffic: bytesToGb(item.fr_ipran_traffic),\n  fr_bw_ipran: mbpsToGbps(item.fr_bw_ipran)\n}));\n\n// Columnas\nconst columns = [\n  { key: 'origen', label: 'Origen' },\n  { key: 'ID', label: 'ID' },\n  { key: 'Acronimo', label: 'Acrónimo' },\n  { key: 'Equipo', label: 'Equipo' },\n  { key: 'Region_MST', label: 'Región MST' },\n  { key: 'bw', label: 'BW' },\n  { key: 'traffic_1d', label: 'Tráfico 1d' },\n  { key: 'traffic_7d', label: 'Tráfico 7d' },\n  { key: 'traffic_30d', label: 'Tráfico 30d' },\n  { key: 'last_update', label: 'Última Actualización' },\n  { key: 'fr_rpv_traffic', label: 'FR RPV Tráfico' },\n  { key: 'fr_inet_traffic', label: 'FR INET Tráfico' },\n  { key: 'fr_bw_rpv', label: 'FR BW RPV' },\n  { key: 'fr_bw_inet', label: 'FR BW INET' },\n  { key: 'fr_ipran_traffic', label: 'FR IPRAN Tráfico' },\n  { key: 'fr_bw_ipran', label: 'FR BW IPRAN' }\n];\n\n// === HTML con script (igual que antes, solo cambian los datos) ===\nconst html = `\n<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Reporte de Tráfico de Red - Claro</title>\n  <style>\n    body {\n      background-color: #121212;\n      color: #e0e0e0;\n      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n      margin: 0;\n      padding: 20px;\n    }\n    .container {\n      max-width: 1800px;\n      margin: 0 auto;\n    }\n    h1 {\n      text-align: center;\n      margin-bottom: 20px;\n      color: #bb86fc;\n      font-size: 1.8em;\n    }\n    table {\n      width: 100%;\n      border-collapse: collapse;\n      background-color: #1e1e1e;\n      border-radius: 8px;\n      overflow: hidden;\n      box-shadow: 0 4px 12px rgba(0,0,0,0.5);\n      font-size: 0.92em;\n    }\n    th, td {\n      padding: 12px 14px;\n      text-align: left;\n      border-bottom: 1px solid #333;\n    }\n    th {\n      background-color: #2d2d2d;\n      color: #bb86fc;\n      font-weight: 600;\n      text-transform: uppercase;\n      font-size: 0.82em;\n      position: sticky;\n      top: 0;\n      cursor: pointer;\n      user-select: none;\n    }\n    th:hover {\n      background-color: #3a3a3a;\n    }\n    th.sort-asc::after {\n      content: ' ▲';\n      color: #4caf50;\n    }\n    th.sort-desc::after {\n      content: ' ▼';\n      color: #f44336;\n    }\n    tr:hover {\n      background-color: #2a2a2a;\n    }\n    .filter-row th {\n      padding-top: 8px;\n      padding-bottom: 12px;\n      background-color: #252525;\n    }\n    .filter-input {\n      width: 100%;\n      padding: 6px 8px;\n      border-radius: 4px;\n      border: 1px solid #444;\n      background-color: #333;\n      color: #fff;\n      font-size: 0.85em;\n      box-sizing: border-box;\n    }\n    .filter-input:focus {\n      outline: none;\n      border-color: #bb86fc;\n    }\n    @media (max-width: 1024px) {\n      table {\n        font-size: 0.8em;\n      }\n      th, td {\n        padding: 10px 8px;\n      }\n    }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <h1>📊 Reporte de Tráfico de Red - Claro</h1>\n    <table id=\"dataTable\">\n      <thead>\n        <tr id=\"headerRow\">\n          ${columns.map(col => `<th data-column=\"${col.key}\">${col.label}</th>`).join('')}\n        </tr>\n        <tr class=\"filter-row\">\n          ${columns.map(col => `<th><input type=\"text\" class=\"filter-input\" placeholder=\"Filtrar...\" data-column=\"${col.key}\"></th>`).join('')}\n        </tr>\n      </thead>\n      <tbody id=\"tableBody\">\n      </tbody>\n    </table>\n  </div>\n\n  <script>\n    const rawData = ${JSON.stringify(tableData)};\n    const columns = ${JSON.stringify(columns)};\n    let currentData = [...rawData];\n    let sortConfig = { key: null, direction: 'asc' };\n\n    const tableBody = document.getElementById('tableBody');\n    const headerRow = document.getElementById('headerRow');\n    const filterInputs = document.querySelectorAll('.filter-input');\n\n    function renderTable(data) {\n      if (data.length === 0) {\n        tableBody.innerHTML = \\`<tr><td colspan=\"\\${columns.length}\" style=\"text-align:center;color:#f44336;padding:20px;\">No hay datos que coincidan con los filtros</td></tr>\\`;\n        return;\n      }\n\n      let rowsHtml = '';\n      for (const row of data) {\n        let cellsHtml = '';\n        for (const col of columns) {\n          const value = row[col.key] || '—';\n          const safeValue = String(value)\n            .replace(/&/g, '&amp;')\n            .replace(/</g, '<')\n            .replace(/>/g, '>');\n          cellsHtml += \\`<td>\\${safeValue}</td>\\`;\n        }\n        rowsHtml += \\`<tr>\\${cellsHtml}</tr>\\`;\n      }\n      tableBody.innerHTML = rowsHtml;\n    }\n\n    function sortData(columnKey) {\n      if (sortConfig.key === columnKey) {\n        sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';\n      } else {\n        sortConfig.key = columnKey;\n        sortConfig.direction = 'asc';\n      }\n\n      document.querySelectorAll('th').forEach(th => {\n        th.classList.remove('sort-asc', 'sort-desc');\n      });\n      const header = document.querySelector(\\`th[data-column=\"\\${columnKey}\"]\\`);\n      if (header) {\n        header.classList.add(sortConfig.direction === 'asc' ? 'sort-asc' : 'sort-desc');\n      }\n\n      currentData.sort((a, b) => {\n        let aVal = a[columnKey] || '';\n        let bVal = b[columnKey] || '';\n\n        const numA = parseFloat(aVal) || aVal;\n        const numB = parseFloat(bVal) || bVal;\n        const isNumA = typeof numA === 'number' && !isNaN(numA);\n        const isNumB = typeof numB === 'number' && !isNaN(numB);\n\n        let comparison = 0;\n        if (isNumA && isNumB) {\n          comparison = numA - numB;\n        } else if (typeof aVal === 'string' && typeof bVal === 'string') {\n          comparison = aVal.localeCompare(bVal, 'es', { numeric: true, sensitivity: 'base' });\n        } else {\n          comparison = String(aVal).localeCompare(String(bVal), 'es', { numeric: true, sensitivity: 'base' });\n        }\n\n        return sortConfig.direction === 'asc' ? comparison : -comparison;\n      });\n\n      applyFilters();\n    }\n\n    function applyFilters() {\n      const filters = {};\n      filterInputs.forEach(input => {\n        const val = input.value.trim().toLowerCase();\n        if (val) filters[input.dataset.column] = val;\n      });\n\n      if (Object.keys(filters).length === 0) {\n        renderTable(currentData);\n        return;\n      }\n\n      const filtered = currentData.filter(row => \n        Object.entries(filters).every(([colKey, term]) => \n          String(row[colKey] || '').toLowerCase().includes(term)\n        )\n      );\n\n      renderTable(filtered);\n    }\n\n    headerRow.addEventListener('click', (e) => {\n      if (e.target.tagName === 'TH') {\n        const colKey = e.target.dataset.column;\n        if (colKey) sortData(colKey);\n      }\n    });\n\n    filterInputs.forEach(input => {\n      input.addEventListener('input', applyFilters);\n    });\n\n    renderTable(currentData);\n  </script>\n</body>\n</html>\n`;\n\nreturn [{ json: { htmlContent: html } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -256
+      ],
+      "id": "d75cdc38-37ce-46d2-8b93-8e364bdade7f",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "ID",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -192,
+        -256
+      ],
+      "id": "0f8a5f09-18f2-4276-8261-fb95ecd86eb0",
+      "name": "Match por ID"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  \"Inv_Equipo\" as origen,\n  ID,\n  Acronimo,\n  Equipo,\n  Region_MST\n  FROM inventario_equipos\n  WHERE rol in (\"AGG\",\"AGGI\")",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -432,
+        -320
+      ],
+      "id": "73a60efd-1d93-469b-8a45-835742531faf",
+      "name": "Inventario_equipos1",
+      "credentials": {
+        "mySql": {
+          "id": "ptMDph8au7xSwRzr",
+          "name": "MySQL datos_red"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Inventario_equipos1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Uso de red",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Uso de red": {
+      "main": [
+        [
+          {
+            "node": "Match por ID",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inventario_equipos1": {
+      "main": [
+        [
+          {
+            "node": "Match por ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match por ID": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "b5b21130-8f89-4eb4-9aae-500dd6115a57",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "createdAt": "2025-10-09T13:58:48.872Z",
+      "updatedAt": "2025-10-09T13:58:48.872Z",
+      "role": "workflow:owner",
+      "workflowId": "uJkNS93cn6bq8ZoA",
+      "projectId": "QdIaKjwyS02MMGZQ",
+      "project": {
+        "createdAt": "2025-09-11T18:03:44.820Z",
+        "updatedAt": "2025-09-11T18:10:14.443Z",
+        "id": "QdIaKjwyS02MMGZQ",
+        "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-09-11T18:03:44.820Z",
+            "updatedAt": "2025-09-11T18:03:44.820Z",
+            "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
+            "projectId": "QdIaKjwyS02MMGZQ",
+            "user": {
+              "createdAt": "2025-09-11T18:03:44.372Z",
+              "updatedAt": "2025-10-21T09:00:53.000Z",
+              "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
+              "email": "saf.empresas@claro.com.ar",
+              "firstName": "Soporte Acceso Empresas",
+              "lastName": " Empresas",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-11T18:11:25.739Z",
+                "personalization_survey_n8n_version": "1.110.1",
+                "automationGoalDevops": [
+                  "ticketing-systems-integrations"
+                ],
+                "companyIndustryExtended": [
+                  "telecoms"
+                ],
+                "companySize": "1000+",
+                "companyType": "other",
+                "role": "devops",
+                "reportedSource": "event"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "qNvPVx6pVl6SWob0",
+                "userActivatedAt": 1758135955025,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1759778484200
+                },
+                "easyAIWorkflowOnboarded": true
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-10-21",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": []
+}
