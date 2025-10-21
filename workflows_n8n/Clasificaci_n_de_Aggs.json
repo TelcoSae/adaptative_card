@@ -1,0 +1,597 @@
+={
+  "createdAt": "2025-10-08T19:22:42.372Z",
+  "updatedAt": "2025-10-14T20:19:40.000Z",
+  "id": "BfH0vgKir5Szfvm7",
+  "name": "Clasificación de Aggs",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1008,
+        -688
+      ],
+      "id": "c6350652-a5d6-443d-9fd1-110ccc1ab200",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  acronimo, \n  equipo, \n  rol, \n  region_MST\n  FROM inventario_equipos\nWHERE rol in(\"AGG\",\"AGGI\")",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -576,
+        -688
+      ],
+      "id": "77e2bc4d-e714-4f87-983a-0ca4e3dda5c0",
+      "name": "Inventario_equipos",
+      "credentials": {
+        "mySql": {
+          "id": "ptMDph8au7xSwRzr",
+          "name": "MySQL datos_red"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "region_MST",
+        "include": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -384,
+        -688
+      ],
+      "id": "25f9d18f-9282-4b14-be8b-964f4100d412",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst resumen = {};\n\nfor (const item of items) {\n  const sysLocation = item.json.sysLocation || \"\";\n  if (!sysLocation.includes(\"ME-\")) continue;\n\n  const region = sysLocation.split('_')[0]; // Ej: \"ME-NJUL\"\n  const criticidad = (item.json.criticidad_servicio?.trim() || \"Desconocida\");\n  const tipo = (item.json.tipo_cliente?.trim() || \"Desconocido\");\n  const cliente = (item.json.Cliente?.trim() || \"SinNombre\");\n\n  if (!resumen[region]) {\n    resumen[region] = {\n      region_MST: region,\n      total_servicios: 0,\n      clientes: new Set(),\n      // Aquí irán directamente los tipos de cliente como claves\n      // Ej: \"PREFER\": { \"No Critico\": 100, ... }\n    };\n  }\n\n  const r = resumen[region];\n  r.total_servicios += 1;\n  r.clientes.add(cliente);\n\n  // Inicializar el tipo de cliente si no existe\n  if (!r[tipo]) {\n    r[tipo] = {};\n  }\n\n  // Contar la criticidad dentro de ese tipo de cliente\n  r[tipo][criticidad] = (r[tipo][criticidad] || 0) + 1;\n}\n\n// Convertir a salida final: reemplazar el Set por el conteo de clientes únicos\nconst salida = Object.values(resumen).map(r => {\n  const { clientes, ...rest } = r; // extraemos 'clientes' del objeto\n  return {\n    region_MST: r.region_MST,\n    total_servicios: r.total_servicios,\n    clientes_unicos: r.clientes.size,\n    ...rest // esto incluye \"PREFER\", \"Empresas y Pymes\", etc.\n  };\n});\n\nreturn salida.map(s => ({ json: s }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        -688
+      ],
+      "id": "d6afb43f-ca4c-4e2b-a1f2-3410ec26716f",
+      "name": "Conteo por region"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  pc.sysname, \n  pc.syslocation, \n  pc.enlace, \n  pc.cliente, \n  pc.producto, \n  co.`criticidad de servicio` AS criticidad_servicio, \n  co.`Tipo de cliente` AS tipo_cliente\nFROM NNMi.ParqueCompleto pc\nLEFT JOIN Clientes.Oracle co\n  ON pc.enlace = co.enlace\nWHERE pc.syslocation LIKE CONCAT('{{ $json.region_MST }}','_%');\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -208,
+        -688
+      ],
+      "id": "e4b3d534-f7b0-4174-a67e-214b1ccdd4aa",
+      "name": "Consulta_Servicios",
+      "credentials": {
+        "mySql": {
+          "id": "bPd34mauVIxhLee1",
+          "name": "MySQL NNMi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \"tipo_cliente\" as origen, tipo_cliente, peso FROM Clientes.tipo_cliente_peso;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -576,
+        -528
+      ],
+      "id": "5e2b87f2-cb33-4950-abde-021852157a97",
+      "name": "Tipo_cliente",
+      "credentials": {
+        "mySql": {
+          "id": "bPd34mauVIxhLee1",
+          "name": "MySQL NNMi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \"criticidad\" as origen, nivel_criticidad AS criticidad_servicio, peso FROM Clientes.criticidad_peso;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -576,
+        -368
+      ],
+      "id": "6e84d306-3b8c-4176-bee1-e7a216386259",
+      "name": "Criticidad",
+      "credentials": {
+        "mySql": {
+          "id": "bPd34mauVIxhLee1",
+          "name": "MySQL NNMi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allInputs = $input.all();\n\n// Separar los datos\nconst regionesItems = [];\nconst pesosTipoItems = [];\nconst pesosCritItems = [];\n\nfor (const item of allInputs) {\n  if (item.json.origen === 'tipo_cliente') {\n    pesosTipoItems.push(item);\n  } else if (item.json.origen === 'criticidad') {\n    pesosCritItems.push(item);\n  } else {\n    regionesItems.push(item);\n  }\n}\n\n// Convertir pesos a objetos para acceso rápido\nconst pesosTipo = {};\nfor (const item of pesosTipoItems) {\n  pesosTipo[item.json.tipo_cliente] = item.json.peso;\n}\n\nconst pesosCrit = {};\nfor (const item of pesosCritItems) {\n  pesosCrit[item.json.criticidad_servicio] = item.json.peso;\n}\n\n// Procesar cada región y calcular puntajes (con SUMA, como en tu versión que funcionaba)\nconst regionesConPuntaje = [];\n\nfor (const regionItem of regionesItems) {\n  const r = regionItem.json;\n  const { region_MST, total_servicios, clientes_unicos, ...tipos } = r;\n\n  let puntaje_total_region = 0;\n  const detalle_por_tipo = {};\n\n  for (const [tipoCliente, criticidades] of Object.entries(tipos)) {\n    let puntaje_tipo = 0;\n\n    for (const [criticidad, cantidad] of Object.entries(criticidades)) {\n      const pesoTipo = pesosTipo[tipoCliente] ?? 0;\n      const pesoCrit = pesosCrit[criticidad] ?? 0;\n      // ✅ Mantenemos la SUMA (tu lógica original que funcionaba)\n      const puntajeItem = (pesoTipo + pesoCrit) * cantidad;\n\n      puntaje_tipo += puntajeItem;\n      puntaje_total_region += puntajeItem;\n    }\n\n    detalle_por_tipo[tipoCliente] = puntaje_tipo;\n  }\n\n  regionesConPuntaje.push({\n    region_MST,\n    total_servicios,\n    clientes_unicos,\n    puntaje_total: puntaje_total_region,\n    puntaje_por_tipo: detalle_por_tipo\n  });\n}\n\n// ✅ Normalización MIN-MAX: mejor = 100, peor = 0\nconst puntajes = regionesConPuntaje.map(r => r.puntaje_total);\nconst max = Math.max(...puntajes);\nconst min = Math.min(...puntajes);\n\nconst resultado = regionesConPuntaje.map(r => {\n  let normalizado;\n  if (max === min) {\n    // Si todos iguales: si son 0 → 0, si son >0 → 100\n    normalizado = max === 0 ? 0 : 100;\n  } else {\n    normalizado = ((r.puntaje_total - min) / (max - min)) * 100;\n  }\n\n  return {\n    region_MST: r.region_MST,\n    total_servicios: r.total_servicios,\n    clientes_unicos: r.clientes_unicos,\n    puntaje_total: r.puntaje_total,\n    puntaje_total: Math.round(normalizado * 100) / 100,\n    puntaje_por_tipo: r.puntaje_por_tipo\n  };\n});\n\nreturn resultado.map(r => ({ json: r }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -528
+      ],
+      "id": "1b076aed-4ea6-4660-802a-c65cd742ccb7",
+      "name": "Puntaje por región"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        144,
+        -544
+      ],
+      "id": "78351d05-47c8-40dc-bd45-cdf957aa0400",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "content": "## Calificación anillos\n",
+        "height": 560,
+        "width": 1104,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -640,
+        -768
+      ],
+      "typeVersion": 1,
+      "id": "85a3ccde-ae77-4298-9d6f-8bc28cab8cd0",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Pico de trafico de aggs\n\n",
+        "height": 416,
+        "width": 1104,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -640,
+        -176
+      ],
+      "typeVersion": 1,
+      "id": "0dad2396-e576-40e6-9137-f5a4a3d22ee7",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        576,
+        -240
+      ],
+      "id": "51fd4e06-d33f-440c-8cc8-835f7439d373",
+      "name": "Merge3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Obtener todos los valores de traffic_30d\nconst trafficValues = items.map(item => item.json.traffic_30d || 0);\n\n// Encontrar min y max\nconst minTraffic = Math.min(...trafficValues);\nconst maxTraffic = Math.max(...trafficValues);\nconst range = maxTraffic - minTraffic || 1;\n\n// Normalizar y devolver los campos necesarios + tráfico en Gb\nreturn items.map(item => {\n  const trafficBytes = item.json.traffic_30d || 0;\n  \n  // Convertir a gigabits (Gb): bytes → bits → Gb\n  const traffic_Gb = (trafficBytes / 1e9);\n\n  // Calcular score\n  const traffic_score = ((trafficBytes - minTraffic) / range) * 100;\n\n  return {\n    json: {\n      Acronimo: item.json.Acronimo,\n      Equipo: item.json.Equipo,\n      Region_MST: item.json.Region_MST,\n      traffic_score: parseFloat(traffic_score.toFixed(2)),\n      traffic_Gb: parseFloat(traffic_Gb.toFixed(2)) // tráfico en gigabits\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -32
+      ],
+      "id": "15288a1a-ea30-45c0-951f-e709a68374e3",
+      "name": "Puntaje por Agg"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\n\nconst datosTrafico = [];\nconst datosPuntaje = [];\n\nfor (const item of allItems) {\n  if (item.json.Acronimo !== undefined) {\n    datosTrafico.push(item.json);\n  } else if (item.json.puntaje_total !== undefined) {\n    datosPuntaje.push(item.json);\n  }\n}\n\n// Mapa de puntaje por región\nconst puntajeMap = {};\nfor (const p of datosPuntaje) {\n  const key = (p.region_MST || '').toString().trim().toUpperCase();\n  puntajeMap[key] = p;\n}\n\n// Lista de tipos de cliente conocidos (ajusta según tu realidad)\nconst tiposConocidos = [\n  \"PREFER\",\n  \"Sin asignar\",\n  \"Desconocido\",\n  \"Corporativo y linea de vida\",\n  \"Grandes Clientes y Carriers\",\n  \"Empresas y Pymes\"\n];\n\n// Función para normalizar nombre de tipo a columna SQL\nfunction normalizarTipo(tipo) {\n  return \"tipo_\" + tipo\n    .replace(/ y /g, \"_y_\")\n    .replace(/\\s+/g, \"_\")\n    .replace(/[^a-zA-Z0-9_]/g, \"\")\n    .replace(/_{2,}/g, \"_\")\n    .replace(/^_+|_+$/g, \"\");\n}\n\nconst resultado = [];\n\nfor (const t of datosTrafico) {\n  const regionKey = (t.Region_MST || '').toString().trim().toUpperCase();\n  const puntajeData = puntajeMap[regionKey] || {\n    puntaje_total: 0,\n    total_servicios: 0,\n    clientes_unicos: 0,\n    puntaje_por_tipo: {}\n  };\n\n  // Renombrar y calcular\n  const puntaje_trafico = t.traffic_score || 0;\n  const puntaje_region = puntajeData.puntaje_total || 0;\n  const puntaje_ranking = (0.3 * puntaje_trafico) + (0.7 * Math.min(puntaje_region, 100));\n\n  // Objeto base con nombres actualizados\n  const salida = {\n    Acronimo: t.Acronimo,\n    Equipo: t.Equipo,\n    Region_MST: t.Region_MST,\n    traffic_Gb: t.traffic_Gb,\n    puntaje_trafico: parseFloat(puntaje_trafico.toFixed(2)), // ✅ renombrado\n    total_servicios: puntajeData.total_servicios || 0,\n    clientes_unicos: puntajeData.clientes_unicos || 0,\n    puntaje_region: puntaje_region, // ✅ renombrado\n    puntaje_ranking: parseFloat(puntaje_ranking.toFixed(2))\n  };\n\n  // Inicializar todos los tipos en 0\n  for (const tipo of tiposConocidos) {\n    const colName = normalizarTipo(tipo);\n    salida[colName] = 0;\n  }\n\n  // Asignar valores reales\n  const puntajePorTipo = puntajeData.puntaje_por_tipo || {};\n  for (const [tipo, valor] of Object.entries(puntajePorTipo)) {\n    const colName = normalizarTipo(tipo);\n    salida[colName] = valor || 0;\n  }\n\n  resultado.push({ json: salida });\n}\n\nreturn resultado;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        -240
+      ],
+      "id": "5bf5d396-7332-4659-8765-fad339869f97",
+      "name": "Ranking"
+    },
+    {
+      "parameters": {
+        "url": "https://api.sae.claro.amx/misc/factibilidad  ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -576,
+        48
+      ],
+      "id": "e1e1dc93-2e3e-471f-8244-4d2fa095d50d",
+      "name": "Uso de red"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "ID",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -96,
+        -32
+      ],
+      "id": "d8e22a75-d975-4660-94e1-5708f1804473",
+      "name": "Match por ID"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  \"Inv_Equipo\" as origen,\n  ID,\n  Acronimo,\n  Equipo,\n  Region_MST\n  FROM inventario_equipos\n  WHERE rol in (\"AGG\",\"AGGI\")",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -576,
+        -112
+      ],
+      "id": "5a2f81e0-a359-459a-99dd-e2dfead52bad",
+      "name": "Inventario_equipos1",
+      "credentials": {
+        "mySql": {
+          "id": "ptMDph8au7xSwRzr",
+          "name": "MySQL datos_red"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\n\nconst values = items.map(item => `(\n  '${item.Acronimo}',\n  ${item.Equipo ? `'${item.Equipo.replace(/'/g, \"''\")}'` : 'NULL'},\n  '${item.Region_MST}',\n  ${item.traffic_Gb ?? 0},\n  ${item.puntaje_trafico ?? 0},\n  ${item.total_servicios ?? 0},\n  ${item.clientes_unicos ?? 0},\n  ${item.puntaje_region ?? 0},\n  ${item.puntaje_ranking ?? 0},\n  ${item.tipo_PREFER ?? 0},\n  ${item.tipo_Sin_asignar ?? 0},\n  ${item.tipo_Desconocido ?? 0},\n  ${item.tipo_Corporativo_y_linea_de_vida ?? 0},\n  ${item.tipo_Grandes_Clientes_y_Carriers ?? 0},\n  ${item.tipo_Empresas_y_Pymes ?? 0}\n)`).join(',');\n\nreturn [{\n  json: {\n    query: `\n      INSERT INTO clasificacion_aggs (\n        Acronimo, Equipo, Region_MST, traffic_Gb, puntaje_trafico,\n        total_servicios, clientes_unicos, puntaje_region, puntaje_ranking,\n        tipo_PREFER, tipo_Sin_asignar, tipo_Desconocido,\n        tipo_Corporativo_y_linea_de_vida, tipo_Grandes_Clientes_y_Carriers,\n        tipo_Empresas_y_Pymes\n      ) VALUES ${values}\n      ON DUPLICATE KEY UPDATE\n        Equipo = VALUES(Equipo),\n        Region_MST = VALUES(Region_MST),\n        traffic_Gb = VALUES(traffic_Gb),\n        puntaje_trafico = VALUES(puntaje_trafico),\n        total_servicios = VALUES(total_servicios),\n        clientes_unicos = VALUES(clientes_unicos),\n        puntaje_region = VALUES(puntaje_region),\n        puntaje_ranking = VALUES(puntaje_ranking),\n        tipo_PREFER = VALUES(tipo_PREFER),\n        tipo_Sin_asignar = VALUES(tipo_Sin_asignar),\n        tipo_Desconocido = VALUES(tipo_Desconocido),\n        tipo_Corporativo_y_linea_de_vida = VALUES(tipo_Corporativo_y_linea_de_vida),\n        tipo_Grandes_Clientes_y_Carriers = VALUES(tipo_Grandes_Clientes_y_Carriers),\n        tipo_Empresas_y_Pymes = VALUES(tipo_Empresas_y_Pymes);\n    `\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        -240
+      ],
+      "id": "f89acf9a-9fb5-47f8-84ea-351263da5299",
+      "name": "Prepara insert"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{$json.query}}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1120,
+        -240
+      ],
+      "id": "a8aea2cb-d90b-4642-a06f-7b633d8fdeec",
+      "name": "Escribir en tabla",
+      "credentials": {
+        "mySql": {
+          "id": "ptMDph8au7xSwRzr",
+          "name": "MySQL datos_red"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Inventario_equipos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Inventario_equipos1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Uso de red",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tipo_cliente",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Criticidad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inventario_equipos": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Consulta_Servicios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conteo por region": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consulta_Servicios": {
+      "main": [
+        [
+          {
+            "node": "Conteo por region",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tipo_cliente": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Criticidad": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Puntaje por región",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Puntaje por región": {
+      "main": [
+        [
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge3": {
+      "main": [
+        [
+          {
+            "node": "Ranking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Puntaje por Agg": {
+      "main": [
+        [
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Ranking": {
+      "main": [
+        [
+          {
+            "node": "Prepara insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Uso de red": {
+      "main": [
+        [
+          {
+            "node": "Match por ID",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Match por ID": {
+      "main": [
+        [
+          {
+            "node": "Puntaje por Agg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inventario_equipos1": {
+      "main": [
+        [
+          {
+            "node": "Match por ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara insert": {
+      "main": [
+        [
+          {
+            "node": "Escribir en tabla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "102f2191-7c96-4d53-b527-85801e9b2af0",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "createdAt": "2025-10-08T19:22:42.375Z",
+      "updatedAt": "2025-10-08T19:22:42.375Z",
+      "role": "workflow:owner",
+      "workflowId": "BfH0vgKir5Szfvm7",
+      "projectId": "QdIaKjwyS02MMGZQ",
+      "project": {
+        "createdAt": "2025-09-11T18:03:44.820Z",
+        "updatedAt": "2025-09-11T18:10:14.443Z",
+        "id": "QdIaKjwyS02MMGZQ",
+        "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-09-11T18:03:44.820Z",
+            "updatedAt": "2025-09-11T18:03:44.820Z",
+            "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
+            "projectId": "QdIaKjwyS02MMGZQ",
+            "user": {
+              "createdAt": "2025-09-11T18:03:44.372Z",
+              "updatedAt": "2025-10-21T09:00:53.000Z",
+              "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
+              "email": "saf.empresas@claro.com.ar",
+              "firstName": "Soporte Acceso Empresas",
+              "lastName": " Empresas",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-11T18:11:25.739Z",
+                "personalization_survey_n8n_version": "1.110.1",
+                "automationGoalDevops": [
+                  "ticketing-systems-integrations"
+                ],
+                "companyIndustryExtended": [
+                  "telecoms"
+                ],
+                "companySize": "1000+",
+                "companyType": "other",
+                "role": "devops",
+                "reportedSource": "event"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "qNvPVx6pVl6SWob0",
+                "userActivatedAt": 1758135955025,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1759778484200
+                },
+                "easyAIWorkflowOnboarded": true
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-10-21",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": []
+}
