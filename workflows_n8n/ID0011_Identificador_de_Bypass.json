@@ -1,8 +1,8 @@
 {
-  "createdAt": "2025-10-01T19:33:05.441Z",
-  "updatedAt": "2025-11-03T15:19:56.000Z",
   "id": "T2pLioa05iAiyTz8",
   "name": "ID0011_Identificador de Bypass",
+  "createdAt": "2025-10-01T19:33:05.441Z",
+  "updatedAt": "2025-11-03T15:19:56.000Z",
   "active": true,
   "isArchived": false,
   "nodes": [
@@ -227,17 +227,10 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "staticData": {
-    "node:Schedule Trigger": {
-      "recurrenceRules": []
-    }
-  },
   "meta": {
     "templateCredsSetupCompleted": true
   },
-  "pinData": {},
-  "versionId": "36ce0c7e-8109-4e3a-9f0a-e1811c4ad11e",
-  "triggerCount": 1,
+  "tags": [],
   "shared": [
     {
       "createdAt": "2025-10-01T19:33:05.445Z",
@@ -301,5 +294,12 @@
       }
     }
   ],
-  "tags": []
+  "versionId": "36ce0c7e-8109-4e3a-9f0a-e1811c4ad11e",
+  "triggerCount": 1,
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    }
+  },
+  "pinData": {}
 }
