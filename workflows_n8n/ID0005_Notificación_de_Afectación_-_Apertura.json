@@ -1,0 +1,183 @@
+{
+  "createdAt": "2025-10-03T20:15:37.699Z",
+  "updatedAt": "2025-11-03T15:18:16.000Z",
+  "id": "2vfILabl4eRvb46K",
+  "name": "ID0005_Notificación de Afectación - Apertura",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  'Eventos_DobleApertura' as Origen, \n  da.Anillo, \n  da.Equipos, \n  da.Servicios, \n  da.Clientes, \n  da.Horario, \n  da.IdAfectacion,\n  da.Escalamiento,\n  inv.region, \n  inv.nombre_sitio,\n  da.IR_SAP\nFROM Eventos.DobleApertura as da\nLEFT JOIN datos_red.inventario_equipos AS inv \n  ON inv.region_mst = SUBSTRING_INDEX(da.Anillo, '_', 1)\nWHERE da.IR_SAP = {{ $json.incidente }}\n\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        256,
+        48
+      ],
+      "id": "d36fb84b-08ac-4aaf-9fa3-1c42daaf083f",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL eventos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://f3da3763bda6e539974bcb2bd9bcbe.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/bf6ce93580494b44b07eaba9a967c221/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=AbC9I0PGl7PPLV7KJNI0A_dGzmHctpO_pMiuN8doNbU",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Origen\": \"{{$json[\"Origen\"]}}\",\n  \"Anillo\": \"{{$json[\"Anillo\"]}}\",\n  \"Equipos\": {{$json[\"Equipos\"]}},\n  \"Servicios\": {{$json[\"Servicios\"]}},\n  \"Clientes\": {{$json[\"Clientes\"]}},\n  \"Horario\": \"{{$json[\"Horario\"]}}\",\n  \"Estado\": \"={{$json[\"Estado\"]}}\",\n  \"IdAfectacion\": \"{{$json[\"IdAfectacion\"]}}\",\n  \"region\": \"{{ $json.region }}\",\n  \"nombre_sitio\": \"{{ $json.nombre_sitio }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        528,
+        256
+      ],
+      "id": "1a6c90e8-ff82-48c4-92d9-f001a51b7f5f",
+      "name": "Aviso a StaffME"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://f3da3763bda6e539974bcb2bd9bcbe.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/742718fdbb754725b363a1128023bf3a/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=KP1iN31pbMqQJf8QzVlMDyyatOa3r2pYRsnHmYEMlqE",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Origen\": \"{{$json[\"Origen\"]}}\",\n  \"Anillo\": \"{{$json[\"Anillo\"]}}\",\n  \"Equipos\": {{$json[\"Equipos\"]}},\n  \"Servicios\": {{$json[\"Servicios\"]}},\n  \"Clientes\": {{$json[\"Clientes\"]}},\n  \"Horario\": \"{{$json[\"Horario\"]}}\",\n  \"Estado\": \"={{$json[\"Estado\"]}}\",\n  \"IdAfectacion\": \"{{$json[\"IdAfectacion\"]}}\",\n  \"region\": \"{{ $json.region }}\",\n  \"nombre_sitio\": \"{{ $json.nombre_sitio }}\",\n  \"nombre_sitio\": \"{{ $json.IR_SAP }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        528,
+        48
+      ],
+      "id": "ab8a8355-1a97-4a05-91b8-edbb6bb9a781",
+      "name": "Aviso a CGE"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        48
+      ],
+      "id": "42b9bda0-a6b9-4bc1-9430-d3d0616ca86d",
+      "name": "When Executed by Another Workflow"
+    }
+  ],
+  "connections": {
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Aviso a CGE",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Aviso a StaffME",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "65a6669a-526c-4334-8e71-f50cc2da299b",
+  "triggerCount": 0,
+  "shared": [
+    {
+      "createdAt": "2025-10-03T20:15:37.703Z",
+      "updatedAt": "2025-10-03T20:15:37.703Z",
+      "role": "workflow:owner",
+      "workflowId": "2vfILabl4eRvb46K",
+      "projectId": "QdIaKjwyS02MMGZQ",
+      "project": {
+        "createdAt": "2025-09-11T18:03:44.820Z",
+        "updatedAt": "2025-09-11T18:10:14.443Z",
+        "id": "QdIaKjwyS02MMGZQ",
+        "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-09-11T18:03:44.820Z",
+            "updatedAt": "2025-09-11T18:03:44.820Z",
+            "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
+            "projectId": "QdIaKjwyS02MMGZQ",
+            "user": {
+              "createdAt": "2025-09-11T18:03:44.372Z",
+              "updatedAt": "2025-11-03T10:00:48.000Z",
+              "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
+              "email": "saf.empresas@claro.com.ar",
+              "firstName": "Soporte Acceso Empresas",
+              "lastName": " Empresas",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-11T18:11:25.739Z",
+                "personalization_survey_n8n_version": "1.110.1",
+                "automationGoalDevops": [
+                  "ticketing-systems-integrations"
+                ],
+                "companyIndustryExtended": [
+                  "telecoms"
+                ],
+                "companySize": "1000+",
+                "companyType": "other",
+                "role": "devops",
+                "reportedSource": "event"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "qNvPVx6pVl6SWob0",
+                "userActivatedAt": 1758135955025,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1759778484200
+                },
+                "easyAIWorkflowOnboarded": true
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-11-03",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": []
+}
