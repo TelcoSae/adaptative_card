@@ -1,8 +1,8 @@
 {
-  "createdAt": "2025-10-01T20:20:08.286Z",
-  "updatedAt": "2025-11-03T15:20:57.000Z",
   "id": "A8gLuoonMovbZ87l",
   "name": "ID9998_Aperturas Simples",
+  "createdAt": "2025-10-01T20:20:08.286Z",
+  "updatedAt": "2025-11-03T15:20:57.000Z",
   "active": false,
   "isArchived": false,
   "nodes": [
@@ -55,13 +55,10 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "staticData": null,
   "meta": {
     "templateCredsSetupCompleted": true
   },
-  "pinData": {},
-  "versionId": "ac3e6b6a-983a-4e78-9e98-d80fff5eb55d",
-  "triggerCount": 0,
+  "tags": [],
   "shared": [
     {
       "createdAt": "2025-10-01T20:20:08.293Z",
@@ -125,5 +122,8 @@
       }
     }
   ],
-  "tags": []
+  "versionId": "ac3e6b6a-983a-4e78-9e98-d80fff5eb55d",
+  "triggerCount": 0,
+  "staticData": null,
+  "pinData": {}
 }
