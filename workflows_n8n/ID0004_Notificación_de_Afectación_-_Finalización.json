@@ -1,0 +1,204 @@
+{
+  "createdAt": "2025-10-06T19:18:58.281Z",
+  "updatedAt": "2025-11-03T15:18:06.000Z",
+  "id": "EcF5TTa5aRCmTcis",
+  "name": "ID0004_Notificación de Afectación - Finalización",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "60627cdc-9eb1-43c4-bfef-0eddc4f6c2ba",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        160,
+        240
+      ],
+      "id": "5863f14c-5ae2-4a09-9c9c-3dce6a913c0a",
+      "name": "Webhook",
+      "webhookId": "60627cdc-9eb1-43c4-bfef-0eddc4f6c2ba"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://f3da3763bda6e539974bcb2bd9bcbe.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/823a64c724474b6984a43ca30fa9aa33/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=BW3V7x-qgJWBCu1xSLV4SVmKKC7OEZixPJ2K-06eQtw",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Anillo\": \"{{$json.Anillo}}\",\n  \"Equipos\": {{$json.Equipos}},\n  \"Servicios\": {{$json.Servicios}},\n  \"Clientes\": {{$json.Clientes}},\n  \"Horario\": \"{{$json.Horario}}\",\n  \"HorarioFin\": \"{{$json.HorarioFin}}\",\n  \"TiempoAfectacion\": \"{{$json.DuracionLegible}}\",\n  \"region\": \"{{$json.region}}\",\n  \"nombre_sitio\": \"{{$json.nombre_sitio}}\",\n  \"IR_SAP\": {{$json.IR_SAP}},\n  \"IdAfectacion\": \"{{$json.IdAfectacion}}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        768,
+        240
+      ],
+      "id": "9e3d52f5-0a23-40f3-8fd4-e6726ca043ea",
+      "name": "Cierre CGE"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://f3da3763bda6e539974bcb2bd9bcbe.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/42b2ac56449b40aabab9de85fba095fa/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=nx4pTAvaEJ39BGsLq3zN0jJzSvF6pprYxp1zB2hZzAA",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Anillo\": \"{{$json.Anillo}}\",\n  \"Equipos\": {{$json.Equipos}},\n  \"Servicios\": {{$json.Servicios}},\n  \"Clientes\": {{$json.Clientes}},\n  \"Horario\": \"{{$json.Horario}}\",\n  \"HorarioFin\": \"{{$json.HorarioFin}}\",\n  \"TiempoAfectacion\": \"{{$json.DuracionLegible}}\",\n  \"region\": \"{{$json.region}}\",\n  \"nombre_sitio\": \"{{$json.nombre_sitio}}\",\n  \"IR_SAP\": {{$json.IR_SAP}},\n  \"IdAfectacion\": \"{{$json.IdAfectacion}}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        768,
+        448
+      ],
+      "id": "1cbedd20-3a74-4e73-b423-0bd4243b4533",
+      "name": "Cierre StaffME"
+    },
+    {
+      "parameters": {
+        "jsCode": "const evento = $json;\n\n// Asegurarse de que TiempoAfectacion exista y sea un número (aunque venga como string)\nconst segundosTotales = parseInt(evento.TiempoAfectacion, 10);\n\nif (isNaN(segundosTotales) || segundosTotales < 0) {\n  throw new Error(`Valor inválido en 'TiempoAfectacion': ${evento.TiempoAfectacion}`);\n}\n\n// Calcular días, horas, minutos y segundos\nconst dias = Math.floor(segundosTotales / 86400);\nconst horas = Math.floor((segundosTotales % 86400) / 3600);\nconst minutos = Math.floor((segundosTotales % 3600) / 60);\nconst segundos = segundosTotales % 60;\n\n// Formato legible: \"X días HH:mm:ss\"\nconst duracionLegible = `${dias} día${dias !== 1 ? 's' : ''} ${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;\n\n// Devolver el ítem original + el nuevo campo\nreturn [\n  {\n    json: {\n      ...evento,\n      DuracionLegible: duracionLegible\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        240
+      ],
+      "id": "876be80d-b73e-41f9-8eaf-a17978267090",
+      "name": "Normaliza"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  'Eventos_DobleApertura' as Origen, \n  da.Anillo, \n  da.Equipos, \n  da.Servicios, \n  da.Clientes, \n  da.Horario, \n  da.HorarioFin,\n  da.TiempoAfectacion,\n  da.IdAfectacion,\n  da.IR_SAP,\n  inv.region, \n  inv.nombre_sitio \nFROM Eventos.DobleApertura as da\nLEFT JOIN datos_red.inventario_equipos AS inv \n  ON inv.region_mst = SUBSTRING_INDEX(da.Anillo, '_', 1)\nWHERE da.IdAfectacion = '{{ $json.query.IdAfectacion }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        352,
+        240
+      ],
+      "id": "519779af-3b06-4026-b32d-c6acbe227190",
+      "name": "Doble Apertura",
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL eventos"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Doble Apertura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliza": {
+      "main": [
+        [
+          {
+            "node": "Cierre CGE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doble Apertura": {
+      "main": [
+        [
+          {
+            "node": "Normaliza",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "6708fee4-a525-480f-9b2e-5f4a14755bc7",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "createdAt": "2025-10-06T19:18:58.283Z",
+      "updatedAt": "2025-10-06T19:18:58.283Z",
+      "role": "workflow:owner",
+      "workflowId": "EcF5TTa5aRCmTcis",
+      "projectId": "QdIaKjwyS02MMGZQ",
+      "project": {
+        "createdAt": "2025-09-11T18:03:44.820Z",
+        "updatedAt": "2025-09-11T18:10:14.443Z",
+        "id": "QdIaKjwyS02MMGZQ",
+        "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-09-11T18:03:44.820Z",
+            "updatedAt": "2025-09-11T18:03:44.820Z",
+            "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
+            "projectId": "QdIaKjwyS02MMGZQ",
+            "user": {
+              "createdAt": "2025-09-11T18:03:44.372Z",
+              "updatedAt": "2025-11-03T10:00:48.000Z",
+              "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
+              "email": "saf.empresas@claro.com.ar",
+              "firstName": "Soporte Acceso Empresas",
+              "lastName": " Empresas",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-11T18:11:25.739Z",
+                "personalization_survey_n8n_version": "1.110.1",
+                "automationGoalDevops": [
+                  "ticketing-systems-integrations"
+                ],
+                "companyIndustryExtended": [
+                  "telecoms"
+                ],
+                "companySize": "1000+",
+                "companyType": "other",
+                "role": "devops",
+                "reportedSource": "event"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "qNvPVx6pVl6SWob0",
+                "userActivatedAt": 1758135955025,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1759778484200
+                },
+                "easyAIWorkflowOnboarded": true
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-11-03",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": []
+}
