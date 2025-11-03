@@ -1,0 +1,1164 @@
+{
+  "createdAt": "2025-09-26T13:58:59.129Z",
+  "updatedAt": "2025-11-03T15:17:33.000Z",
+  "id": "LrhT9xwv6bOswXQa",
+  "name": "ID0001_Doble apertura_PowerAutomate",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -352,
+        -224
+      ],
+      "id": "d943fe88-0092-41c3-9365-9e22ad9d328e",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\n\n// Separamos según el campo Origen\nconst nnmi = items.filter(ev => ev.Origen === 'NNMi_DobleApertura');\nconst eventos = items.filter(ev => ev.Origen === 'Eventos_DobleApertura');\n\n// Generar clave única\nfunction makeKey(ev) {\n  return `${ev.Anillo}|${ev.Equipos}|${ev.Servicios}|${ev.Clientes}|${ev.Horario}`;\n}\n\n// Generar UUID v4\nfunction uuidv4() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n    const r = (Math.random() * 16) | 0;\n    const v = c === 'x' ? r : (r & 0x3) | 0x8;\n    return v.toString(16);\n  });\n}\n\n// Mapear ambos orígenes con su clave\nconst mapnnmi = new Map(nnmi.map(ev => [makeKey(ev), ev]));\nconst mapeventos = new Map(eventos.map(ev => [makeKey(ev), ev]));\n\nconst salida = [];\n\n// Clasificamos Nuevo y Existe\nfor (const [key, ev] of mapnnmi.entries()) {\n  if (mapeventos.has(key)) {\n    // usar el evento de \"Eventos_DobleApertura\"\n    const evEvento = mapeventos.get(key);\n    salida.push({ json: { ...evEvento, Estado: \"Existe\" } });\n  } else {\n    salida.push({ json: { ...ev, Estado: \"Nuevo\", IdAfectacion: uuidv4() } });\n  }\n}\n\n// Clasificamos Cerrar\nfor (const [key, ev] of mapeventos.entries()) {\n  if (!mapnnmi.has(key)) {\n    salida.push({ json: { ...ev, Estado: \"Cerrar\" } });\n  }\n}\n\nreturn salida;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        -224
+      ],
+      "id": "2530c96f-af3d-47fb-beee-d6304fd36513",
+      "name": "Clasificador"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.Estado }}",
+                    "rightValue": "Nuevo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "21e3cf2f-49af-40f6-87dc-10710d3581e3"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Nuevo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d90e758f-ed60-4690-98d3-7dfc9d0afb5e",
+                    "leftValue": "={{ $json.Estado }}",
+                    "rightValue": "Existe",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Existe"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0889b6de-b088-4021-a31e-edee4b4e7144",
+                    "leftValue": "={{ $json.Estado }}",
+                    "rightValue": "Cerrar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Cerrar"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        176,
+        -240
+      ],
+      "id": "7538f565-aada-4d3c-8b8c-db7e763fdb0b",
+      "name": "Derivador"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst derivador = $items(\"Derivador\");\nconst daAfecta = $items(\"Consulta NNMi.Afectacion\");\n\n\nconst resultado = daAfecta.map(da => {\n  const match = derivador.find(d => d.json.Anillo === da.json.sysLocation);\n\n  return {\n    json: {\n      sysName: da.json.sysName,\n      sysLocation: da.json.sysLocation,\n      enlace: da.json.enlace,\n      Cliente: da.json.Cliente,\n      Producto: da.json.Producto,\n      \"Estado VTV\": da.json[\"Estado VTV\"],\n      Critico: da.json.Critico,\n      IdAfectacion: match ? match.json.IdAfectacion : null\n    }\n  };\n});\n\nreturn resultado;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        -976
+      ],
+      "id": "2c6a7d78-4af8-4117-8d4b-b8dfb4f9d501",
+      "name": "Unifica"
+    },
+    {
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "value": "Afectacion",
+          "mode": "list",
+          "cachedResultName": "Afectacion"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1456,
+        -976
+      ],
+      "id": "ae61547c-11b7-4929-b19f-419f91ff1c7c",
+      "name": "Insert Eventos.Afectacion",
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL eventos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT DISTINCT 'NNMi.Afectacion' as Origen, sysName, sysLocation, enlace, Cliente, Producto, `Estado VTV`, Critico\nFROM Afectacion\nWHERE sysLocation = '{{ $json.Anillo }}'",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        864,
+        -992
+      ],
+      "id": "58428dcf-9cc4-4e0b-96c2-b1060791273b",
+      "name": "Consulta NNMi.Afectacion",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "mySql": {
+          "id": "bPd34mauVIxhLee1",
+          "name": "MySQL NNMi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  'NNMi_DobleApertura' as Origen, \n  da.Anillo, \n  da.Equipos, \n  da.Servicios, \n  da.Clientes, \n  da.Horario, \n  inv.region, \n  inv.nombre_sitio \n  FROM NNMi.DobleApertura as da\n  LEFT JOIN datos_red.inventario_equipos AS inv \n  ON inv.region_mst = SUBSTRING_INDEX(da.Anillo, '_', 1)",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -624,
+        -416
+      ],
+      "id": "b47a3fe6-ef03-414d-a79f-a90811de6c53",
+      "name": "NNMi.DobleApertura",
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "mySql": {
+          "id": "bPd34mauVIxhLee1",
+          "name": "MySQL NNMi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  'Eventos_DobleApertura' as Origen, \n  da.Anillo, \n  da.Equipos, \n  da.Servicios, \n  da.Clientes, \n  da.Horario, \n  da.IdAfectacion,\n  da.Escalamiento,\n  inv.region, \n  inv.nombre_sitio,\n  da.IR_SAP\nFROM Eventos.DobleApertura as da\nLEFT JOIN datos_red.inventario_equipos AS inv \n  ON inv.region_mst = SUBSTRING_INDEX(da.Anillo, '_', 1)\nWHERE HorarioFin IS NULL;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -624,
+        -208
+      ],
+      "id": "10e6fb94-5696-4778-8f16-6d635eef62fc",
+      "name": "Eventos.DobleApertura",
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL eventos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO Eventos.DobleApertura (\n  IdAfectacion, Anillo, Equipos, Servicios, Clientes, Horario\n)\nVALUES (\n  '{{ $json.IdAfectacion }}',\n  '{{ $json.Anillo }}',\n  '{{ $json.Equipos }}',\n  {{ $json.Servicios }},\n  {{ $json.Clientes }},\n  '{{ $json.Horario }}'\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        864,
+        -1392
+      ],
+      "id": "8f9b2ad9-04f6-4f54-a894-669a05d1f7d1",
+      "name": "Insert Eventos.DobleApertura",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL eventos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE Eventos.DobleApertura\nSET \n  HorarioFin = '{{ $json.HorarioFin }}',\n  TiempoAfectacion = {{ $json.TiempoAfectacion }}\nWHERE \n  Anillo = '{{ $json.Anillo }}' AND\n  Equipos = '{{ $json.Equipos }}' AND\n  Servicios = {{ $json.Servicios }} AND\n  Clientes = {{ $json.Clientes }} AND\n  Horario = '{{ $json.Horario }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1424,
+        688
+      ],
+      "id": "3be51465-31c0-4bf8-bd8e-450727b9efd4",
+      "name": "Cierre Evento.DobleApertura",
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL eventos"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1072,
+        -976
+      ],
+      "id": "7f7c9bcd-ffdc-40fa-a25d-5e017c180ced",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "68ad4a7d-8136-4fcf-9da7-144af91d8540",
+              "leftValue": "={{ $json.shouldRun }}",
+              "rightValue": "tru",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1024,
+        -192
+      ],
+      "id": "766e9b99-b481-4285-ae86-d413c1d970d4",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "content": "## Consultas:\n\n**Vista NNMi.DobleApertura:** donde visualizamos los eventos de red.\n\n**Tabla Evento.DobleApertura:** donde guardamos registro de los eventos.\n\n**Merge** une los output para la clasificación de los datos.\n\n",
+        "height": 720,
+        "width": 528,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -736,
+        -672
+      ],
+      "typeVersion": 1,
+      "id": "144903db-7053-4d8f-84ff-6aae95013afa",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Esquema reiterancia\n\n**Disparador:** definido para iniciar el flujo cada 2 minutos.\n\n**Ventana:** define cuando se ejecutara el flujo, configurado para omitir ventanas de tareas programadas.\n\n**Función IF:** solo valida si es verdadero y permite avanzar con el flujo.",
+        "height": 720,
+        "width": 528,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1296,
+        -672
+      ],
+      "typeVersion": 1,
+      "id": "2a09d6c7-7cdf-426a-9cca-dfd67069e96e",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Clasificación:\n\n**Clasificador:** interpreta y define el tipo de evento.\n\n**-Nuevo:** evento existente solo en la Vista NNMi.DobleApertura.\n\n**-Existe:** el evento existe en la Vista NNMi.DobleApertura y en la Tabla Eventos.DobleApertura.\n\n**-Cerrar:** el evento existe solo en la Tabla Eventos.DobleApertura\n\n**Derivador:** dependiendo de la clasificación, deriva el flujo a los diferentes módulos.",
+        "height": 720,
+        "width": 528,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -176,
+        -672
+      ],
+      "typeVersion": 1,
+      "id": "3ccd381f-3652-486b-a5d5-17f8096dc358",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1200,
+        -432
+      ],
+      "id": "a82c6ada-d8ac-4de9-a3fa-b9cbca3767d6",
+      "name": "Disparador",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "content": "## Escritura Doble Apertura\n**Tabla Eventos.DobleApertura:** escritura en tabla de respaldo, donde se escribe datos del evento con su Id único.\n",
+        "height": 336,
+        "width": 1168,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        688,
+        -1520
+      ],
+      "typeVersion": 1,
+      "id": "dade9c38-a534-4627-a114-fc5b28345246",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Escritura Afectación\n**Tabla Eventos.Afectacion:** escritura en tabla de respaldo, donde se escribe datos de la afectacion del evento con su Id único.\n",
+        "height": 384,
+        "width": 1168,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        688,
+        -1152
+      ],
+      "typeVersion": 1,
+      "id": "4ed3d960-443f-4b07-b396-0608345279f9",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Aviso a PowerAutomate\n**Tarjeta adaptativa:** aviso con datos del evento, incluye un link que lleva a la vista de afectación.",
+        "height": 352,
+        "width": 1168,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        688,
+        -1888
+      ],
+      "typeVersion": 1,
+      "id": "9ce09cc1-8895-4254-b606-62642b16f406",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## CIERRE DE EVENTO",
+        "height": 832,
+        "width": 1232,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        656,
+        128
+      ],
+      "typeVersion": 1,
+      "id": "0acfbe11-ede8-42a1-b710-95d0bbead68a",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "## Tiempo de cierre\n**Cálculo de cierre:** función que calcula el tiempo de afectación.",
+        "height": 720,
+        "width": 400,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        688,
+        192
+      ],
+      "typeVersion": 1,
+      "id": "5f63f707-8034-4375-b057-3887d277ed75",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "content": "## Tarjeta de aviso \n**Tarjeta adaptativa:** aviso con datos del evento, incluye un link que lleva a la vista de afectación.",
+        "height": 320,
+        "width": 736,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1136,
+        192
+      ],
+      "typeVersion": 1,
+      "id": "64268f1e-8926-4f2a-8adb-20e296838fd2",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "content": "## Escritura \n**Tabla Eventos.DobleApertura:** escritura en tabla de respaldo, donde se escribe datos cierre del evento.\n",
+        "height": 368,
+        "width": 736,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1136,
+        544
+      ],
+      "typeVersion": 1,
+      "id": "e2c583e5-d4c6-423c-a75a-2e035e4c1833",
+      "name": "Sticky Note10"
+    },
+    {
+      "parameters": {
+        "jsCode": "const evento = $json;\n\n// === 1. Obtener hora actual de Buenos Aires (GMT-3) ===\nconst ahora = new Date();\nconst horarioFin = ahora.toLocaleString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });\n// Formato: \"YYYY-MM-DD HH:mm:ss\"\n\n// === 2. Calcular duración exacta en milisegundos ===\nconst inicio = new Date(evento.Horario); // Asegúrate de que este campo sea una fecha válida\nconst fin = new Date(horarioFin.replace(' ', 'T')); // Convertir a formato ISO para Date()\n\nconst diferenciaMs = fin - inicio;\nconst duracionSeg = Math.floor(diferenciaMs / 1000); // Duración total en segundos\n\n// === 3. Convertir a días, horas, minutos y segundos ===\nconst dias = Math.floor(duracionSeg / 86400);\nconst horas = Math.floor((duracionSeg % 86400) / 3600);\nconst minutos = Math.floor((duracionSeg % 3600) / 60);\nconst segundos = duracionSeg % 60;\n\n// === 4. Formato legible: \"6 días 06:15:55\" ===\nconst duracionLegible = `${dias} días ${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;\n\n// === 5. Devolver el ítem actualizado ===\nreturn [\n  {\n    json: {\n      ...evento,\n      Origen: \"DA_DobleApertura\",\n      Estado: \"Cerrar\",\n      HorarioFin: horarioFin, // Ej: \"2024-06-15 14:30:45\" (hora de Buenos Aires)\n      TiempoAfectacion: duracionSeg, // En segundos (puedes cambiar a minutos si prefieres)\n      DuracionLegible: duracionLegible\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        480
+      ],
+      "id": "555e2db5-92a6-4203-91c1-cb16167e36a1",
+      "name": "Cálculo de cierre"
+    },
+    {
+      "parameters": {
+        "content": "## REGISTRO DE EVENTO\n",
+        "height": 1216,
+        "width": 1232,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        656,
+        -1952
+      ],
+      "typeVersion": 1,
+      "id": "cbe61b2f-ecfe-492d-ade8-5c29848a9ac3",
+      "name": "Sticky Note13"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://f3da3763bda6e539974bcb2bd9bcbe.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/af35775b13d64280803addfb99f7ad08/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=WilfXN3U8lKsmqYuOtHBY_zI8BLtLReGheAjuUqpBsY",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Origen\": \"{{$json[\"Origen\"]}}\",\n  \"Anillo\": \"{{$json[\"Anillo\"]}}\",\n  \"Equipos\": {{$json[\"Equipos\"]}},\n  \"Servicios\": {{$json[\"Servicios\"]}},\n  \"Clientes\": {{$json[\"Clientes\"]}},\n  \"Horario\": \"{{$json[\"Horario\"]}}\",\n  \"Estado\": \"{{$json[\"Estado\"]}}\",\n  \"IdAfectacion\": \"{{$json[\"IdAfectacion\"]}}\",\n  \"region\": \"{{ $json.region }}\",\n  \"nombre_sitio\": \"{{ $json.nombre_sitio }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1152,
+        -1728
+      ],
+      "id": "a188d19e-8af6-422f-b254-c426e4941a04",
+      "name": "Aviso a SAE"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a4f7a4a3-b5a5-4c80-b2f4-8cc8bacf0ffb",
+              "leftValue": "={{ $json.nivelCalculado }}",
+              "rightValue": "={{ $json.Escalamiento }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1072,
+        -336
+      ],
+      "id": "021e1069-70b9-45ea-9510-c2d133156dc6",
+      "name": "Escalar?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://f3da3763bda6e539974bcb2bd9bcbe.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/a81c7dca764443be822fdea6d7eba7b3/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=8KXNE7Rivv_65qxHP8574-RfKtWoJTb9l-uUl3BCJA0",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Origen\": \"{{$json[\"Origen\"]}}\",\n  \"Anillo\": \"{{$json[\"Anillo\"]}}\",\n  \"Equipos\": {{$json[\"Equipos\"]}},\n  \"Servicios\": {{$json[\"Servicios\"]}},\n  \"Clientes\": {{$json[\"Clientes\"]}},\n  \"Horario\": \"{{$json[\"Horario\"]}}\",\n  \"region\": \"{{ $json.region }}\",\n  \"nombre_sitio\": \"{{ $json.nombre_sitio }}\",\n\"horastranscurridas\": {{ $json.horasTranscurridas }},\n\"IdAfectacion\": \"{{ $json.IdAfectacion }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1504,
+        -144
+      ],
+      "id": "0f40f8a9-200f-43a6-b82d-0c31234041eb",
+      "name": "Escalamiento BOFO"
+    },
+    {
+      "parameters": {
+        "content": "## Escalamiento a BOFO cada 4hs",
+        "height": 688,
+        "width": 1232,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        656,
+        -640
+      ],
+      "typeVersion": 1,
+      "id": "51f3f06d-0ebb-4d97-9c98-cf96ccc7d6b9",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ahora = new Date();\nreturn items.map(item => {\n  const horario = new Date(item.json.Horario);\n  const horasTranscurridas = (ahora - horario) / (1000 * 60 * 60);\n  \n  const niveles = [4, 8, 12, 16, 20, 24];\n  let nivelCalculado = 0;\n  for (let i = 0; i < niveles.length; i++) {\n    if (horasTranscurridas >= niveles[i]) {\n      nivelCalculado = i + 1;\n    } else {\n      break;\n    }\n  }\n\n  return {\n    json: {\n      ...item.json,\n      horasTranscurridas: parseFloat(horasTranscurridas.toFixed(2)),\n      nivelCalculado\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        -336
+      ],
+      "id": "d5468a3b-f514-484f-9eaa-7e7dd1c23cb6",
+      "name": "Calcula tiempo"
+    },
+    {
+      "parameters": {
+        "content": "## Registro de escalamiento\n**Tabla Eventos.DobleApertura:** actualiza estado de escalamiento en la tabla\n",
+        "height": 272,
+        "width": 560,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1296,
+        -576
+      ],
+      "typeVersion": 1,
+      "id": "af949751-84a3-45fd-beee-29bb3dfe6b0a",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {
+        "content": "## Aviso a PowerAutomate\n**Tarjeta adaptativa:** aviso con datos del evento, incluye un link que lleva a la vista de afectación.\n",
+        "height": 304,
+        "width": 560,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1296,
+        -288
+      ],
+      "typeVersion": 1,
+      "id": "d38c59d4-9747-4358-8cce-d85de4f2a334",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "content": "## Evaluacion para escalamiento\n\n",
+        "height": 592,
+        "width": 560,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        672,
+        -576
+      ],
+      "typeVersion": 1,
+      "id": "fbd382a5-d44f-43f0-807c-ce2482bbba29",
+      "name": "Sticky Note14"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE Eventos.DobleApertura\nSET Escalamiento = {{ $json.nivelCalculado }}\nWHERE IdAfectacion = '{{ $json.IdAfectacion }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1504,
+        -480
+      ],
+      "id": "96d72e39-0440-44ab-a44e-b12c9429897e",
+      "name": "Actualiza Eventos.DobleApertura",
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL eventos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ajuste para zona horaria: Buenos Aires (GMT-3 = UTC-3)\n// Si tu servidor ya está en GMT-3, elimina la línea de ajuste\n\nconst nowUTC = new Date();\nconst buenosAiresTime = new Date(nowUTC.getTime() - 3 * 60 * 60 * 1000); // Solo si tu servidor está en UTC\n\n// Si tu servidor YA está en GMT-3, usa directamente:\n// const buenosAiresTime = new Date();\n\nconst day = buenosAiresTime.getDay(); // 0 = dom, 1 = lun, ..., 6 = sáb\nconst hour = buenosAiresTime.getHours();\n\nlet shouldRun = false;\n\nif (day >= 1 && day <= 5) {\n  // Lunes a viernes: permitido desde las 6 AM\n  shouldRun = hour >= 6;\n} else {\n  // Sábado (6) o domingo (0): permitido todo el día\n  shouldRun = true;\n}\n\n// Devolvemos el valor booleano en un campo\nreturn [{ json: { ...$input.item.json, shouldRun } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1024,
+        -432
+      ],
+      "id": "adac1fb7-32a2-4213-beaa-804359e78fda",
+      "name": "Ventana horario"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "33cd078a-03ee-4663-b9fe-ba42127b42b7",
+              "leftValue": "={{ $json[\"Servicios\"] }}",
+              "rightValue": 10,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        832,
+        -1712
+      ],
+      "id": "27d294d2-5600-45f5-9357-25936b21f541",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "33cd078a-03ee-4663-b9fe-ba42127b42b7",
+              "leftValue": "={{ $json[\"Servicios\"] }}",
+              "rightValue": 10,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1264,
+        336
+      ],
+      "id": "b49c3819-1e43-40e8-bdf4-68d41357a20d",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "33cd078a-03ee-4663-b9fe-ba42127b42b7",
+              "leftValue": "={{ $json[\"Servicios\"] }}",
+              "rightValue": 10,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        704,
+        -224
+      ],
+      "id": "66b28b55-849e-430c-ba49-4fbc6ebc3f01",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://f3da3763bda6e539974bcb2bd9bcbe.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/7440a959249144e99cd8aba017e2be95/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=64d4QtkHnJVkiLa8Xs5Gbtiw9l45IlLwP1hTSrA7-nY",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Anillo\": \"{{$json.Anillo}}\",\n  \"Equipos\": {{$json.Equipos}},\n  \"Servicios\": {{$json.Servicios}},\n  \"Clientes\": {{$json.Clientes}},\n  \"Horario\": \"{{$json.Horario}}\",\n  \"HorarioFin\": \"{{$json.HorarioFin}}\",\n  \"TiempoAfectacion\": \"{{$json.DuracionLegible}}\",\n  \"region\": \"{{$json.region}}\",\n  \"nombre_sitio\": \"{{$json.nombre_sitio}}\",\n  \"IR_SAP\": {{$json.IR_SAP}},\n  \"IdAfectacion\": \"{{$json.IdAfectacion}}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        320
+      ],
+      "id": "5c01c9f4-2b43-4f61-8817-c7a2af438d81",
+      "name": "Aviso a SAE cierre"
+    }
+  ],
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Clasificador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificador": {
+      "main": [
+        [
+          {
+            "node": "Derivador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Derivador": {
+      "main": [
+        [
+          {
+            "node": "Insert Eventos.DobleApertura",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Consulta NNMi.Afectacion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cálculo de cierre",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        []
+      ]
+    },
+    "Unifica": {
+      "main": [
+        [
+          {
+            "node": "Insert Eventos.Afectacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consulta NNMi.Afectacion": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NNMi.DobleApertura": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eventos.DobleApertura": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Cierre Evento.DobleApertura": {
+      "main": [
+        []
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Unifica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "NNMi.DobleApertura",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Eventos.DobleApertura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disparador": {
+      "main": [
+        [
+          {
+            "node": "Ventana horario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cálculo de cierre": {
+      "main": [
+        [
+          {
+            "node": "Cierre Evento.DobleApertura",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalar?": {
+      "main": [
+        [
+          {
+            "node": "Escalamiento BOFO",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Actualiza Eventos.DobleApertura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalamiento BOFO": {
+      "main": [
+        []
+      ]
+    },
+    "Calcula tiempo": {
+      "main": [
+        [
+          {
+            "node": "Escalar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ventana horario": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aviso a SAE": {
+      "main": [
+        []
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Aviso a SAE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Aviso a SAE cierre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "Calcula tiempo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Argentina/Buenos_Aires",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    },
+    "node:Disparador": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "0372b27c-fd2a-463e-ae00-3215636eab45",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "createdAt": "2025-09-26T13:58:59.133Z",
+      "updatedAt": "2025-09-26T13:58:59.133Z",
+      "role": "workflow:owner",
+      "workflowId": "LrhT9xwv6bOswXQa",
+      "projectId": "QdIaKjwyS02MMGZQ",
+      "project": {
+        "createdAt": "2025-09-11T18:03:44.820Z",
+        "updatedAt": "2025-09-11T18:10:14.443Z",
+        "id": "QdIaKjwyS02MMGZQ",
+        "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-09-11T18:03:44.820Z",
+            "updatedAt": "2025-09-11T18:03:44.820Z",
+            "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
+            "projectId": "QdIaKjwyS02MMGZQ",
+            "user": {
+              "createdAt": "2025-09-11T18:03:44.372Z",
+              "updatedAt": "2025-11-03T10:00:48.000Z",
+              "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
+              "email": "saf.empresas@claro.com.ar",
+              "firstName": "Soporte Acceso Empresas",
+              "lastName": " Empresas",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-11T18:11:25.739Z",
+                "personalization_survey_n8n_version": "1.110.1",
+                "automationGoalDevops": [
+                  "ticketing-systems-integrations"
+                ],
+                "companyIndustryExtended": [
+                  "telecoms"
+                ],
+                "companySize": "1000+",
+                "companyType": "other",
+                "role": "devops",
+                "reportedSource": "event"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "qNvPVx6pVl6SWob0",
+                "userActivatedAt": 1758135955025,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1759778484200
+                },
+                "easyAIWorkflowOnboarded": true
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-11-03",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": []
+}
