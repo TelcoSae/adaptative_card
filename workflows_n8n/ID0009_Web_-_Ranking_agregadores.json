@@ -1,8 +1,8 @@
 {
-  "createdAt": "2025-10-09T16:07:34.281Z",
-  "updatedAt": "2025-11-03T15:19:28.000Z",
   "id": "1tuv7r0TLTv4yikL",
   "name": "ID0009_Web - Ranking agregadores",
+  "createdAt": "2025-10-09T16:07:34.281Z",
+  "updatedAt": "2025-11-03T16:38:35.000Z",
   "active": true,
   "isArchived": false,
   "nodes": [
@@ -120,13 +120,10 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "staticData": null,
   "meta": {
     "templateCredsSetupCompleted": true
   },
-  "pinData": {},
-  "versionId": "e42cc332-3e3b-40c3-a54d-fdbd2ec23cbb",
-  "triggerCount": 1,
+  "tags": [],
   "shared": [
     {
       "createdAt": "2025-10-09T16:07:34.284Z",
@@ -190,5 +187,8 @@
       }
     }
   ],
-  "tags": []
+  "versionId": "e42cc332-3e3b-40c3-a54d-fdbd2ec23cbb",
+  "triggerCount": 1,
+  "staticData": null,
+  "pinData": {}
 }
