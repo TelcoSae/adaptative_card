@@ -1,0 +1,816 @@
+{
+  "id": "tQ8hskjoNcoliWIo",
+  "name": "ID0006_Creacion de IR SAP",
+  "createdAt": "2025-09-30T13:48:06.759Z",
+  "updatedAt": "2025-11-03T16:35:41.000Z",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  'Eventos_Afectacion' as Origen, \n  af.sysLocation, \n  af.sysName, \n  af.enlace, \n  af.cliente, \n  af.producto,\n  af.critico,\n  af.IdAfectacion\nFROM Eventos.Afectacion as af\nLEFT JOIN datos_red.inventario_equipos AS inv \n  ON inv.region_mst = SUBSTRING_INDEX(af.sysLocation, '_', 1)\nWHERE   af.IdAfectacion = '{{ $json.query.IdAfectacion }}';\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -224,
+        -208
+      ],
+      "id": "e02aa5b0-8f1d-45d8-bcac-ac14d607db86",
+      "name": "Eventos_Afectacion",
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL eventos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  'Eventos_DobleApertura' as Origen, \n  da.Anillo, \n  da.Equipos, \n  da.Servicios, \n  da.Clientes, \n  da.Horario, \n  da.IdAfectacion,\n  da.IR_SAP,\n  inv.region, \n  inv.nombre_sitio \nFROM Eventos.DobleApertura as da\nLEFT JOIN datos_red.inventario_equipos AS inv \n  ON inv.region_mst = SUBSTRING_INDEX(da.Anillo, '_', 1)\nWHERE da.IdAfectacion = '{{ $json.query.IdAfectacion }}';\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -224,
+        -448
+      ],
+      "id": "40cdd0d0-96eb-4c05-98b2-aa9d252a998f",
+      "name": "Eventos_DobleApertura",
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL eventos"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        0,
+        -320
+      ],
+      "id": "d3014692-a8be-4f05-9805-1fe7792661dc",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst dobleApertura = items.find(item => item.json.Origen === \"Eventos_DobleApertura\");\nconst afectaciones = items.filter(item => item.json.Origen === \"Eventos_Afectacion\");\n\nif (!dobleApertura) {\n  return { json: { error: \"No se encontró información de Eventos_DobleApertura\" } };\n}\n\n// 🔍 Clasificación: nuevo o existente\nconst IR_SAP = dobleApertura.json.IR_SAP || 0;\nconst tipoAfectacion = IR_SAP !== 0 ? \"existente\" : \"nuevo\";\n\n// Construir el texto formateado (sin cambios en formato)\nlet texto = `DETALLE DE AFECTACIÓN\\n`;\ntexto += `${'='.repeat(50)}\\n\\n`;\n\n// Información del anillo\ntexto += `ID Afectación: ${dobleApertura.json.IdAfectacion}\\n`;\ntexto += `Anillo: ${dobleApertura.json.Anillo}\\n`;\ntexto += `Sitio: ${dobleApertura.json.nombre_sitio}\\n`;\ntexto += `Región: ${dobleApertura.json.region}\\n`;\ntexto += `Horario: ${dobleApertura.json.Horario}\\n`;\ntexto += `Equipos Afectados: ${dobleApertura.json.Equipos}\\n`;\ntexto += `Servicios Afectados: ${dobleApertura.json.Servicios}\\n`;\ntexto += `Clientes Afectados: ${dobleApertura.json.Clientes}\\n\\n`;\n\n// Detalle de clientes\ntexto += `CLIENTES IMPACTADOS:\\n`;\ntexto += `${'-'.repeat(50)}\\n`;\n\nafectaciones.forEach((afc, index) => {\n  const cliente = afc.json.cliente || 'Sin información';\n  const producto = afc.json.producto || 'Sin información';\n  \n  texto += `   Equipo: ${afc.json.sysName}\\n`;\n  texto += `\\n${index + 1}. Cliente: ${cliente}\\n`;\n  texto += `   Enlace: ${afc.json.enlace}\\n`;\n  texto += `   Crítico: ${afc.json.critico === 1 ? 'SÍ' : 'NO'}\\n`;\n});\n\ntexto = texto.replace(/\\n/g, '\\r\\n');\n\n// ✅ Devolver con clasificación\nreturn {\n  json: {\n    tipo_afectacion: tipoAfectacion,\n    IR_SAP: IR_SAP,\n    texto_evento: texto,\n    IdAfectacion: dobleApertura.json.IdAfectacion,\n    total_clientes: afectaciones.length,\n    anillo: dobleApertura.json.Anillo,\n    sitio: dobleApertura.json.nombre_sitio,\n    region: dobleApertura.json.region\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -320
+      ],
+      "id": "5d798a42-dca3-498e-89a0-07e4b9771bfd",
+      "name": "Nota Evento"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Obtener todos los ítems del flujo (debe haber 2)\nconst items = $input.all();\n\n// Buscar el ítem con \"incidente\"\nconst itemIncidente = items.find(item => item.json.incidente !== undefined);\n\n// Buscar el ítem con \"texto_evento\"\nconst itemTexto = items.find(item => item.json.texto_evento !== undefined);\n\n// Validar que ambos existen\nif (!itemIncidente) {\n  throw new Error(\"❌ No se encontró el ítem con 'incidente'\");\n}\nif (!itemTexto) {\n  throw new Error(\"❌ No se encontró el ítem con 'texto_evento'\");\n}\n\n// Devolver un SOLO ítem combinado\nreturn {\n  json: {\n    incidente: itemIncidente.json.incidente,\n    texto_evento: itemTexto.json.texto_evento\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        -352
+      ],
+      "id": "6ba3520b-61e0-4aec-9a17-4d6ffe1b6f45",
+      "name": "Normaliza IR+Nota",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\n// Obtener fecha/hora actual\nconst ahora = new Date();\n\n// Calcular fecha/hora + 4 horas\nconst finIncidente = new Date(ahora.getTime() + (4 * 60 * 60 * 1000));\n\n// ✅ Formatear fecha fin en formato SAP: YYYYMMDD\nconst diaFin = String(finIncidente.getDate()).padStart(2, '0');\nconst mesFin = String(finIncidente.getMonth() + 1).padStart(2, '0');\nconst anioFin = finIncidente.getFullYear();\nconst fechaFinSAP = `${anioFin}${mesFin}${diaFin}`; // ← ¡Orden correcto para SAP!\n\n// Formatear hora fin (HH:MM:SS) – esto está bien\nconst horaFin = String(finIncidente.getHours()).padStart(2, '0');\nconst minutoFin = String(finIncidente.getMinutes()).padStart(2, '0');\nconst segundoFin = String(finIncidente.getSeconds()).padStart(2, '0');\nconst horaFinFormato = `${horaFin}:${minutoFin}:${segundoFin}`;\n\nreturn {\n  json: {\n    \"componente\": \"METRO\",\n    \"descripcion\": `Doble Apertura - ${data.anillo}`,\n    \"empleado\": \"0002690174\",\n    \"finDia\": fechaFinSAP, // ← Ahora en formato YYYYMMDD\n    \"finHora\": horaFinFormato,\n    \"Impacto\": \"01\",\n    \"metEntrada\": \"ZI4\",\n    \"nota\": `Doble Apertura - ${data.anillo}`,\n    \"sintoma\": \"Caído\",\n    \"tecnologia\": \"METH\",\n    \"urgencia\": \"01\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        -560
+      ],
+      "id": "a1d45834-f7fc-44c6-b6b4-f34a17e7710b",
+      "name": "Json Sap Crear"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  json: {\n    payload: {\n      claseNota: \"S002\",\n      grupoServ: \"0002684121\",\n      grupoServX: \"X\",\n      idIncidente: String($input.item.json.incidente), // asegurar string\n      idTipoInc: \"ZINR\",\n      nota: $input.item.json.texto_evento, // este valor puede tener \\r\\n, comillas, etc.\n      notaX: \"X\"\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        -352
+      ],
+      "id": "297d6b7e-2787-45cc-8916-8b06f919fcef",
+      "name": "Json Sap Modificar"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://webdisp2.claro.amx:8106/RESTAdapter/mat/servicios/zinr/modifica",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2048,
+        -352
+      ],
+      "id": "f42ab97f-a11b-4d1c-b841-59149697069b",
+      "name": "Deriva+Nota",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "UNXB3CN4iquO67M0",
+          "name": "USERMAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## CREAR IR ",
+        "height": 272,
+        "width": 592,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        608,
+        -624
+      ],
+      "typeVersion": 1,
+      "id": "ef3eeb07-c8d2-41a4-b3ce-68c7efcc0347",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://webdisp2.claro.amx:8106/RESTAdapter/mat/servicios/zinr/alta",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        976,
+        -560
+      ],
+      "id": "9e0397b2-e8fe-4f23-b11b-d9b9eaf6c178",
+      "name": "Crea IR",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "UNXB3CN4iquO67M0",
+          "name": "USERMAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Actualiza y deriva IR",
+        "height": 288,
+        "width": 960,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1312,
+        -464
+      ],
+      "typeVersion": 1,
+      "id": "050cd6e0-82af-45ab-8e16-3a8dba8ad659",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## TOMA DE EVIDENCIA Y ARMADO DE NOTA",
+        "height": 576,
+        "width": 976,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -480,
+        -560
+      ],
+      "typeVersion": 1,
+      "id": "5415da7b-bda8-47f1-8e2e-ba9901e4dcdd",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "path": "513574ae-f9d2-443d-8d0b-cfc847c72bd6",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -432,
+        -320
+      ],
+      "id": "1153433c-f115-4fc5-b1dc-ab004ca61cfb",
+      "name": "Webhook",
+      "webhookId": "513574ae-f9d2-443d-8d0b-cfc847c72bd6"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE DobleApertura \nSET IR_SAP = {{ $json.incidente }} \nWHERE IdAfectacion = \"{{ $json.IdAfectacion }}\";",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        2048,
+        -48
+      ],
+      "id": "3ebbe45f-9a23-46ae-8a23-19c1b3f12bea",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL eventos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Actualiza IR en tabla DobleApertura",
+        "height": 272,
+        "width": 960,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1312,
+        -160
+      ],
+      "typeVersion": 1,
+      "id": "4e106314-df04-4e25-b5bd-edce0f380c79",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tipo_afectacion }}",
+                    "rightValue": "nuevo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "8bee7346-e8f1-45fe-8cae-370c4e6d758b"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Nuevo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e3c395ce-5b70-4245-bd8f-150a2d68e6bc",
+                    "leftValue": "={{ $json.tipo_afectacion }}",
+                    "rightValue": "existente",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Existente"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        304,
+        -320
+      ],
+      "id": "375e7be2-6e0c-4276-b277-314f68ee156a",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "2vfILabl4eRvb46K",
+          "mode": "list",
+          "cachedResultName": "Notificación de Afectación - Apertura"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2048,
+        256
+      ],
+      "id": "67ff75e7-dd5b-47cd-bb70-86829641f5a7",
+      "name": "Call 'Notificación de Afectacion'"
+    },
+    {
+      "parameters": {
+        "content": "## AVISO DE QUE LA IR YA EXISTE\n",
+        "height": 272,
+        "width": 592,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        624,
+        -160
+      ],
+      "typeVersion": 1,
+      "id": "a76234ff-9750-4975-b4ea-fc0d5d9a148a",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://f3da3763bda6e539974bcb2bd9bcbe.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/d96b1c7b954140f9926bf739e49a5d0f/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=4TTJD6StBwFDvcZBzbmKPV4qy7tZI-eKGBKpYt_d6Ag",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Anillo\": \"{{$json[\"anillo\"]}}\",\n  \"IR_SAP\": \"{{$json[\"IR_SAP\"]}}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        816,
+        -64
+      ],
+      "id": "cb2195cc-580f-4280-8a4c-d89304f25353",
+      "name": "Aviso existente"
+    },
+    {
+      "parameters": {
+        "content": "## AVISO DE QUE LA IR FUE CREADA",
+        "height": 384,
+        "width": 960,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1312,
+        -880
+      ],
+      "typeVersion": 1,
+      "id": "f0cc4f55-1a45-4e0c-9af2-8ad810396ec9",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://f3da3763bda6e539974bcb2bd9bcbe.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/3a6dead034744b069c3589ff638d77a2/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Jrtr8a5kanYc_bmgmAfrgB-Jhn4O5IU374e3IZ1mBhU",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Anillo\": \"{{$json[\"anillo\"]}}\",\n  \"IR_SAP\": \"{{$json[\"incidente\"]}}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2032,
+        -656
+      ],
+      "id": "72970777-0926-45b0-acc1-51e1bd805e30",
+      "name": "Aviso nueva IR"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1472,
+        -352
+      ],
+      "id": "a15bd49f-0c58-4ee1-adc6-865825fec06b",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "content": "## AVISO A CGE y STAFF ME DE QUE LA IR FUE CREADA ",
+        "height": 272,
+        "width": 496,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1776,
+        160
+      ],
+      "typeVersion": 1,
+      "id": "6d7e6e3a-1162-4f36-8d4b-b04cb27cf81e",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json[\"html\"] }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2032,
+        -848
+      ],
+      "id": "2086212e-20b2-45c7-a30c-a1944ca4c8ae",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Obtener todos los ítems (deberían ser 2)\nconst items = $input.all();\n\nif (items.length < 2) {\n  throw new Error('Se esperaban 2 ítems: incidente y afectación');\n}\n\nconst incidenteData = items[0].json; // Primer ítem\nconst afectacionData = items[1].json; // Segundo ítem\n\n// Construir el objeto combinado con solo los campos deseados\nconst resultado = {\n  incidente: incidenteData.incidente,\n  mensaje: incidenteData.mensaje,\n  anillo: afectacionData.anillo,\n  sitio: afectacionData.sitio,\n  region: afectacionData.region,\n  texto_evento: afectacionData.texto_evento\n};\n\n// Devolver como un solo ítem\nreturn [{ json: resultado }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        -656
+      ],
+      "id": "9e4956ae-c100-4b7a-84cb-66447b987019",
+      "name": "Combinar datos"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.item.json;\n\n// Escapar caracteres especiales para HTML (seguridad básica)\nconst escapeHtml = (str) => {\n  if (typeof str !== 'string') return str;\n  return str\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '<')\n    .replace(/>/g, '>')\n    .replace(/\\r\\n|\\r|\\n/g, '<br>');\n};\n\nconst html = `\n<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/>\n  <title>Incidente #${data.incidente}</title>\n  <style>\n    body {\n      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n      background: #f8f9fa;\n      margin: 0;\n      padding: 20px;\n      color: #333;\n    }\n    .container {\n      max-width: 900px;\n      margin: 0 auto;\n      background: white;\n      border-radius: 12px;\n      box-shadow: 0 4px 20px rgba(0,0,0,0.08);\n      overflow: hidden;\n    }\n    .header {\n      background: linear-gradient(135deg, #4361ee, #3a0ca3);\n      color: white;\n      padding: 24px 32px;\n    }\n    .header h1 {\n      margin: 0;\n      font-size: 1.8rem;\n      font-weight: 600;\n    }\n    .header p {\n      margin: 8px 0 0;\n      opacity: 0.9;\n      font-size: 1.1rem;\n    }\n    .content {\n      padding: 24px 32px;\n    }\n    .info-grid {\n      display: grid;\n      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n      gap: 16px;\n      margin-bottom: 24px;\n    }\n    .info-card {\n      background: #f1f3f5;\n      padding: 14px;\n      border-radius: 8px;\n      font-size: 0.95rem;\n    }\n    .info-card strong {\n      display: block;\n      color: #4361ee;\n      margin-bottom: 4px;\n    }\n    .event-text {\n      background: #2b2d42;\n      color: #f8f9fa;\n      padding: 20px;\n      border-radius: 8px;\n      font-family: 'Courier New', monospace;\n      font-size: 0.95rem;\n      line-height: 1.5;\n      white-space: pre-wrap;\n      overflow-x: auto;\n    }\n    .label {\n      font-size: 0.85rem;\n      text-transform: uppercase;\n      color: #6c757d;\n      margin-bottom: 4px;\n    }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>Incidente #${data.incidente}</h1>\n      <p>${escapeHtml(data.mensaje)}</p>\n    </div>\n    <div class=\"content\">\n      <div class=\"info-grid\">\n        <div class=\"info-card\">\n          <span class=\"label\">Anillo</span>\n          <strong>${escapeHtml(data.anillo)}</strong>\n        </div>\n        <div class=\"info-card\">\n          <span class=\"label\">Sitio</span>\n          <strong>${escapeHtml(data.sitio)}</strong>\n        </div>\n        <div class=\"info-card\">\n          <span class=\"label\">Región</span>\n          <strong>${escapeHtml(data.region)}</strong>\n        </div>\n      </div>\n\n      <h2>Detalle del Evento</h2>\n      <div class=\"event-text\">${escapeHtml(data.texto_evento)}</div>\n    </div>\n  </div>\n</body>\n</html>\n`;\n\nreturn [{\n  json: { html }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        -848
+      ],
+      "id": "c735c3c8-d19e-4618-b911-5e406ba4f196",
+      "name": "Html"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Suponiendo que items[0] tiene \"incidente\" y items[1] tiene \"IdAfectacion\"\nconst incidenteItem = items[0].json;\nconst afectacionItem = items[1].json;\n\nreturn {\n  json: {\n    incidente: incidenteItem.incidente,\n    IdAfectacion: afectacionItem.IdAfectacion\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        -48
+      ],
+      "id": "5dfc6294-784e-40aa-ab52-b24cd99830d1",
+      "name": "Normalizacion"
+    }
+  ],
+  "connections": {
+    "Eventos_DobleApertura": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eventos_Afectacion": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Nota Evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nota Evento": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliza IR+Nota": {
+      "main": [
+        [
+          {
+            "node": "Json Sap Modificar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Json Sap Crear": {
+      "main": [
+        [
+          {
+            "node": "Crea IR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Json Sap Modificar": {
+      "main": [
+        [
+          {
+            "node": "Deriva+Nota",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crea IR": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Eventos_DobleApertura",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Eventos_Afectacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Json Sap Crear",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Aviso existente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        []
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Normaliza IR+Nota",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Normalizacion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Combinar datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Combinar datos": {
+      "main": [
+        [
+          {
+            "node": "Aviso nueva IR",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Html": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizacion": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Call 'Notificación de Afectacion'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [],
+  "shared": [
+    {
+      "createdAt": "2025-09-30T13:48:06.762Z",
+      "updatedAt": "2025-09-30T13:48:06.762Z",
+      "role": "workflow:owner",
+      "workflowId": "tQ8hskjoNcoliWIo",
+      "projectId": "QdIaKjwyS02MMGZQ",
+      "project": {
+        "createdAt": "2025-09-11T18:03:44.820Z",
+        "updatedAt": "2025-09-11T18:10:14.443Z",
+        "id": "QdIaKjwyS02MMGZQ",
+        "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-09-11T18:03:44.820Z",
+            "updatedAt": "2025-09-11T18:03:44.820Z",
+            "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
+            "projectId": "QdIaKjwyS02MMGZQ",
+            "user": {
+              "createdAt": "2025-09-11T18:03:44.372Z",
+              "updatedAt": "2025-11-05T12:06:20.000Z",
+              "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
+              "email": "saf.empresas@claro.com.ar",
+              "firstName": "Soporte Acceso Empresas",
+              "lastName": " Empresas",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-11T18:11:25.739Z",
+                "personalization_survey_n8n_version": "1.110.1",
+                "automationGoalDevops": [
+                  "ticketing-systems-integrations"
+                ],
+                "companyIndustryExtended": [
+                  "telecoms"
+                ],
+                "companySize": "1000+",
+                "companyType": "other",
+                "role": "devops",
+                "reportedSource": "event"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "qNvPVx6pVl6SWob0",
+                "userActivatedAt": 1758135955025,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1759778484200
+                },
+                "easyAIWorkflowOnboarded": true
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-11-05",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "versionId": "9966f1e4-981e-48de-b5e4-a72c8ea5e5da",
+  "triggerCount": 1,
+  "staticData": null,
+  "pinData": {}
+}
