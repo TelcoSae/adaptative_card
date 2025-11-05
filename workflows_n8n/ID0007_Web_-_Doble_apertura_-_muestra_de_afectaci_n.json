@@ -1,0 +1,253 @@
+{
+  "id": "wrIbGKpIaWXbciKm",
+  "name": "ID0007_Web - Doble apertura - muestra de afectación",
+  "createdAt": "2025-09-24T19:03:22.240Z",
+  "updatedAt": "2025-11-03T16:35:47.000Z",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "1bc980b4-fb6d-4f4f-8ed8-68b59e9f1dd0",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -192
+      ],
+      "id": "aa3a1da2-9a48-4338-bea0-378ee964de70",
+      "name": "Webhook",
+      "webhookId": "1bc980b4-fb6d-4f4f-8ed8-68b59e9f1dd0"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// === 1. SEPARAR POR ORIGEN ===\nconst dobleAperturaItems = items.filter(i => i.json.Origen === \"Eventos.DobleApertura\");\nconst afectacionItems = items.filter(i => i.json.Origen === \"Eventos.Afectacion\");\n\n// === 2. DATOS DE DOBLE APERTURA ===\nlet anillo = \"Desconocido\";\nlet region = \"—\";\nlet nombreSitio = \"—\";\nlet horario = null;\nlet horarioFin = null;\nlet tiempoAfectacionSegundos = null;\nlet IR_SAP = 0;\nlet Escalamiento = 0;\n\nif (dobleAperturaItems.length > 0) {\n  // Buscar el item con HorarioFin más completo (no vacío)\n  const itemConFin = dobleAperturaItems.find(i => {\n    const hf = i.json.HorarioFin;\n    return hf !== null && hf !== undefined && hf.toString().trim() !== \"\";\n  });\n  const itemBase = itemConFin || dobleAperturaItems[0];\n  const da = itemBase.json;\n\n  anillo = da.Anillo || da.syslocation || \"Desconocido\";\n  region = da.region || \"—\";\n  nombreSitio = da.nombre_sitio || \"—\";\n  horario = da.Horario || null;\n  horarioFin = da.HorarioFin || null;\n\n  // Normalizar horarioFin: eliminar cadenas vacías\n  if (horarioFin !== null && horarioFin !== undefined) {\n    const hfStr = String(horarioFin).trim();\n    horarioFin = hfStr === \"\" ? null : hfStr;\n  }\n\n  // Tiempo de afectación\n  const rawTiempo = da.TiempoAfectacion;\n  if (rawTiempo !== null && rawTiempo !== undefined && rawTiempo !== \"\") {\n    tiempoAfectacionSegundos = parseInt(rawTiempo, 10);\n  }\n\n  // Extraer IR_SAP y Escalamiento (manejar strings y números)\n  IR_SAP = da.IR_SAP !== undefined \n    ? (typeof da.IR_SAP === 'string' ? (parseInt(da.IR_SAP, 10) || 0) : da.IR_SAP) \n    : 0;\n  Escalamiento = da.Escalamiento !== undefined \n    ? (typeof da.Escalamiento === 'string' ? (parseInt(da.Escalamiento, 10) || 0) : da.Escalamiento) \n    : 0;\n}\n\n// === 3. FUNCIÓN: Formato de tiempo (segundos → \"X días hh:mm:ss\") ===\nfunction formatTiempo(segundos) {\n  if (isNaN(segundos) || segundos < 0) return \"0 días 00:00:00\";\n  const dias = Math.floor(segundos / 86400);\n  const horas = Math.floor((segundos % 86400) / 3600);\n  const minutos = Math.floor((segundos % 3600) / 60);\n  const seg = segundos % 60;\n  const diaTexto = dias === 1 ? \"día\" : \"días\";\n  return `${dias} ${diaTexto} ${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}:${seg.toString().padStart(2, '0')}`;\n}\n\n// === 4. VALORES PARA MOSTRAR (estáticos) ===\nconst total = afectacionItems.length;\nconst criticos = afectacionItems.filter(i => i.json.critico === 1 || i.json.critico === '1').length;\nlet tiempoAfectacionTexto = \"—\";\nlet estadoFin = horarioFin || \"En curso\";\nlet claseFin = horarioFin ? \"\" : \"en-curso\";\n\nif (tiempoAfectacionSegundos !== null) {\n  tiempoAfectacionTexto = formatTiempo(tiempoAfectacionSegundos);\n} else if (horario && !horarioFin) {\n  const ahora = new Date();\n  const inicio = new Date(horario);\n  if (!isNaN(inicio.getTime())) {\n    const diffSeg = Math.floor((ahora - inicio) / 1000);\n    tiempoAfectacionTexto = formatTiempo(diffSeg);\n  }\n}\n\n// === 5. CSV / TXT ===\nfunction generateCsvData() {\n  const headers = ['sysname', 'syslocation', 'enlace', 'cliente', 'producto', 'estado vtv', 'critico'];\n  const rows = afectacionItems.map(i => {\n    const ev = i.json;\n    return [\n      `\"${(ev.sysname || '').replace(/\"/g, '\"\"')}\"`,\n      `\"${(ev.syslocation || '').replace(/\"/g, '\"\"')}\"`,\n      `\"${(ev.enlace || '').replace(/\"/g, '\"\"')}\"`,\n      `\"${(ev.cliente || '').replace(/\"/g, '\"\"')}\"`,\n      `\"${(ev.producto || '').replace(/\"/g, '\"\"')}\"`,\n      `\"${(ev[\"estado vtv\"] || '').replace(/\"/g, '\"\"')}\"`,\n      ev.critico === 1 || ev.critico === '1' ? '1' : '0'\n    ].join(',');\n  });\n  const csv = [headers.join(','), ...rows].join('\\n');\n  return btoa(unescape(encodeURIComponent(csv)));\n}\n\nfunction generateTxtData() {\n  const txt = afectacionItems.map(i => {\n    const ev = i.json;\n    return [\n      `SysName: ${ev.sysname || '—'}`,\n      `Ubicación: ${ev.syslocation || '—'}`,\n      `Enlace: ${ev.enlace || '—'}`,\n      `Cliente: ${ev.cliente || '—'}`,\n      `Producto: ${ev.producto || '—'}`,\n      `Estado VTV: ${ev[\"estado vtv\"] || '—'}`,\n      `Crítico: ${ev.critico === 1 || ev.critico === '1' ? 'SÍ' : 'NO'}`,\n      '---'\n    ].join('\\n');\n  }).join('\\n\\n');\n  return btoa(unescape(encodeURIComponent(txt)));\n}\n\nconst csvBase64 = generateCsvData();\nconst txtBase64 = generateTxtData();\n\n// === 6. TOP CLIENTES / PRODUCTOS ===\nconst clienteCount = {};\nafectacionItems.forEach(i => {\n  const cliente = i.json.cliente || 'Desconocido';\n  clienteCount[cliente] = (clienteCount[cliente] || 0) + 1;\n});\nconst topClientes = Object.entries(clienteCount)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 5);\n\nconst productoCount = {};\nafectacionItems.forEach(i => {\n  const producto = i.json.producto || 'Desconocido';\n  productoCount[producto] = (productoCount[producto] || 0) + 1;\n});\nconst topProductos = Object.entries(productoCount)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 5);\n\n// === 7. HTML COMPLETO ===\nlet html = `\n<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Resumen de Evento - ${anillo}</title>\n  <style>\n    * { margin: 0; padding: 0; box-sizing: border-box; }\n    body {\n      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n      background: #000000;\n      color: #f0f0f0;\n      padding: 20px;\n    }\n    .container { max-width: 1800px; margin: 0 auto; }\n\n    header {\n      display: flex;\n      justify-content: space-between;\n      align-items: flex-start;\n      margin-bottom: 24px;\n      flex-wrap: wrap;\n      gap: 16px;\n    }\n    header > div:first-child {\n      flex: 1;\n      min-width: 300px;\n    }\n    h1 { \n      font-size: 24px; \n      font-weight: 700; \n      color: #ffffff; \n      margin: 0;\n    }\n    .region-sitio {\n      font-size: 16px;\n      color: #aaaaaa;\n      margin-top: 6px;\n    }\n\n    .download-btns {\n      display: flex;\n      gap: 10px;\n      align-self: flex-start;\n    }\n    .btn {\n      padding: 8px 14px;\n      font-size: 14px;\n      border: none;\n      border-radius: 6px;\n      cursor: pointer;\n      font-weight: 600;\n      color: white;\n    }\n    .btn-csv { background: #3b82f6; }\n    .btn-txt { background: #8b5cf6; }\n    .btn:hover { opacity: 0.9; }\n\n    /* === RESUMEN: TARJETAS EN LÍNEA === */\n    .summary-row {\n      display: flex;\n      gap: 16px;\n      margin-bottom: 24px;\n      flex-wrap: wrap;\n    }\n    .summary-card {\n      flex: 1;\n      min-width: 200px;\n      background: #1e1e1e;\n      border-radius: 12px;\n      padding: 20px;\n      box-shadow: 0 4px 12px rgba(0,0,0,0.5);\n    }\n    .card-title {\n      font-size: 12px;\n      color: #aaaaaa;\n      text-transform: uppercase;\n      letter-spacing: 0.7px;\n      margin-bottom: 8px;\n    }\n    .card-value {\n      font-size: 18px;\n      font-weight: 700;\n      color: #ffffff;\n    }\n    .card-value.en-curso {\n      color: #ff6b6b;\n    }\n\n    /* === GRÁFICOS === */\n    .charts {\n      display: flex;\n      gap: 30px;\n      margin-bottom: 30px;\n      flex-wrap: wrap;\n    }\n    .chart {\n      flex: 1;\n      min-width: 300px;\n      background: #1e1e1e;\n      padding: 20px;\n      border-radius: 12px;\n      box-shadow: 0 4px 12px rgba(0,0,0,0.5);\n    }\n    .chart h2 {\n      font-size: 18px;\n      margin-bottom: 16px;\n      color: #ffffff;\n    }\n    .bar-item {\n      display: flex;\n      align-items: center;\n      margin-bottom: 12px;\n    }\n    .bar-label {\n      width: 180px;\n      font-size: 14px;\n      color: #cccccc;\n      overflow: hidden;\n      text-overflow: ellipsis;\n      white-space: nowrap;\n    }\n    .bar-container {\n      flex: 1;\n      height: 24px;\n      background: #2d2d2d;\n      border-radius: 4px;\n      overflow: hidden;\n      position: relative;\n    }\n    .bar-fill {\n      height: 100%;\n      background: #3b82f6;\n      border-radius: 4px;\n    }\n    .bar-value {\n      position: absolute;\n      right: 8px;\n      top: 0;\n      color: #ffffff;\n      font-weight: 600;\n      font-size: 13px;\n      line-height: 24px;\n    }\n\n    /* === TABLA === */\n    .tabla-container {\n      overflow-x: auto;\n      background: #1e1e1e;\n      border-radius: 12px;\n      box-shadow: 0 4px 12px rgba(0,0,0,0.5);\n      padding: 16px;\n    }\n    table {\n      width: 100%;\n      border-collapse: collapse;\n      min-width: 1000px;\n    }\n    th {\n      background: #252525;\n      color: #ffffff;\n      text-align: left;\n      padding: 12px 16px;\n      font-weight: 600;\n      text-transform: uppercase;\n      font-size: 12px;\n      letter-spacing: 0.8px;\n    }\n    td {\n      padding: 12px 16px;\n      border-bottom: 1px solid #2d2d2d;\n      color: #f0f0f0;\n    }\n    tr:last-child td {\n      border-bottom: none;\n    }\n    tr.critico-row {\n      background: rgba(255, 107, 107, 0.08);\n      border-left: 3px solid #ff6b6b;\n    }\n    tr.critico-row td:first-child {\n      padding-left: 13px;\n    }\n    tr:hover {\n      background: rgba(255, 255, 255, 0.03);\n    }\n    .critico-cell {\n      font-weight: bold;\n    }\n    .critico-si { color: #ff6b6b; }\n    .critico-no { color: #4ade80; }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <header>\n      <div>\n        <h1>Resumen de Evento - ${anillo}</h1>\n        <div class=\"region-sitio\">${region} - ${nombreSitio}</div>\n      </div>\n      <div class=\"download-btns\">\n        <a class=\"btn btn-csv\" href=\"data:text/csv;base64,${csvBase64}\" download=\"eventos.csv\">CSV</a>\n        <a class=\"btn btn-txt\" href=\"data:text/plain;base64,${txtBase64}\" download=\"eventos.txt\">TXT</a>\n      </div>\n    </header>\n\n    <!-- Resumen en tarjetas separadas -->\n    <div class=\"summary-row\">\n      <!-- Comienzo -->\n      <div class=\"summary-card\">\n        <div class=\"card-title\">Comienzo</div>\n        <div class=\"card-value\">${horario || '—'}</div>\n      </div>\n\n      <!-- Finalización -->\n      <div class=\"summary-card\">\n        <div class=\"card-title\">Finalización</div>\n        <div class=\"card-value ${claseFin}\">${estadoFin}</div>\n      </div>\n\n      <!-- Tiempo de Afectación -->\n      <div class=\"summary-card\">\n        <div class=\"card-title\">Tiempo de Afectación</div>\n        <div class=\"card-value\" id=\"tiempoAfectacion\">${tiempoAfectacionTexto}</div>\n      </div>\n\n      <!-- Total Eventos -->\n      <div class=\"summary-card\">\n        <div class=\"card-title\">Total Eventos</div>\n        <div class=\"card-value\">${total}</div>\n      </div>\n\n      <!-- Críticos -->\n      <div class=\"summary-card\">\n        <div class=\"card-title\">Críticos</div>\n        <div class=\"card-value\" style=\"color: #ff6b6b;\">${criticos}</div>\n      </div>\n\n      <!-- IR SAP -->\n      <div class=\"summary-card\">\n        <div class=\"card-title\">IR SAP</div>\n        <div class=\"card-value\">${IR_SAP}</div>\n      </div>\n\n      <!-- Escalamiento a BOFO -->\n      <div class=\"summary-card\">\n        <div class=\"card-title\">Escalamiento a BOFO</div>\n        <div class=\"card-value\">${Escalamiento}</div>\n      </div>\n    </div>\n\n    <!-- Gráficos -->\n    <div class=\"charts\">\n      <div class=\"chart\">\n        <h2>Top 5 Clientes con más afectaciones</h2>\n        ${topClientes.map(([cliente, count]) => {\n          const maxCount = topClientes[0][1] || 1;\n          const width = Math.max(30, (count / maxCount) * 100);\n          return `\n            <div class=\"bar-item\">\n              <div class=\"bar-label\" title=\"${cliente}\">${cliente}</div>\n              <div class=\"bar-container\">\n                <div class=\"bar-fill\" style=\"width: ${width}%;\"></div>\n                <div class=\"bar-value\">${count}</div>\n              </div>\n            </div>\n          `;\n        }).join('')}\n      </div>\n\n      <div class=\"chart\">\n        <h2>Top 5 Productos afectados</h2>\n        ${topProductos.map(([producto, count]) => {\n          const maxCount = topProductos[0][1] || 1;\n          const width = Math.max(30, (count / maxCount) * 100);\n          return `\n            <div class=\"bar-item\">\n              <div class=\"bar-label\" title=\"${producto}\">${producto}</div>\n              <div class=\"bar-container\">\n                <div class=\"bar-fill\" style=\"width: ${width}%;\"></div>\n                <div class=\"bar-value\">${count}</div>\n              </div>\n            </div>\n          `;\n        }).join('')}\n      </div>\n    </div>\n\n    <!-- Tabla -->\n    <div class=\"tabla-container\">\n      <table>\n        <thead>\n          <tr>\n            <th>SysName</th>\n            <th>Ubicación</th>\n            <th>Enlace</th>\n            <th>Cliente</th>\n            <th>Producto</th>\n            <th>Estado VTV</th>\n            <th>Crítico</th>\n          </tr>\n        </thead>\n        <tbody>\n`;\n\nfor (const item of afectacionItems) {\n  const ev = item.json;\n  const esCritico = ev.critico === 1 || ev.critico === '1';\n  const textoCritico = esCritico ? 'SÍ' : 'NO';\n  const claseCritico = esCritico ? 'critico-si' : 'critico-no';\n  const rowClass = esCritico ? 'critico-row' : '';\n\n  html += `\n          <tr class=\"${rowClass}\">\n            <td>${ev.sysname || '—'}</td>\n            <td>${ev.syslocation || '—'}</td>\n            <td>${ev.enlace || '—'}</td>\n            <td>${ev.cliente || '—'}</td>\n            <td>${ev.producto || '—'}</td>\n            <td>${ev[\"estado vtv\"] || '—'}</td>\n            <td class=\"critico-cell ${claseCritico}\">${textoCritico}</td>\n          </tr>`;\n}\n\nhtml += `\n        </tbody>\n      </table>\n    </div>\n  </div>\n\n  <!-- Script para contador en vivo -->\n  <script>\n    (function() {\n      const horarioFin = ${horarioFin ? JSON.stringify(horarioFin) : \"null\"};\n      const horarioInicio = ${horario ? JSON.stringify(horario) : \"null\"};\n      const tiempoFijo = ${tiempoAfectacionSegundos !== null ? tiempoAfectacionSegundos : \"null\"};\n      const elemento = document.getElementById('tiempoAfectacion');\n\n      if (!elemento) return;\n\n      // Si ya finalizó y tenemos tiempo fijo, no hacemos contador\n      if (horarioFin && tiempoFijo !== null) {\n        return;\n      }\n\n      // Si está en curso, iniciamos el contador\n      if (!horarioFin && horarioInicio) {\n        const inicio = new Date(horarioInicio).getTime();\n\n        function actualizar() {\n          const ahora = new Date().getTime();\n          const diffMs = ahora - inicio;\n          const diffSeg = Math.floor(diffMs / 1000);\n          \n          const dias = Math.floor(diffSeg / 86400);\n          const horas = Math.floor((diffSeg % 86400) / 3600);\n          const minutos = Math.floor((diffSeg % 3600) / 60);\n          const seg = diffSeg % 60;\n          const diaTexto = dias === 1 ? \"día\" : \"días\";\n          const tiempo = \\`\\${dias} \\${diaTexto} \\${horas.toString().padStart(2, '0')}:\\${minutos.toString().padStart(2, '0')}:\\${seg.toString().padStart(2, '0')}\\`;\n          \n          elemento.textContent = tiempo;\n        }\n\n        actualizar(); // Inmediato\n        setInterval(actualizar, 1000); // Cada segundo\n      }\n    })();\n  </script>\n</body>\n</html>\n`;\n\nreturn [{ json: { html } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -96
+      ],
+      "id": "e9d17015-64c6-4d4f-b1c1-40a852a6d932",
+      "name": "PaginaWeb"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT 'Eventos.Afectacion' as Origen, sysname, syslocation, enlace, cliente, producto, `estado vtv`, critico FROM Eventos.Afectacion WHERE IdAfectacion = '{{ $json.query.IdAfectacion }}'",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        208,
+        0
+      ],
+      "id": "a98ea132-6cd7-433a-8b4e-6a3a70657f7a",
+      "name": "Consulta Eventos.Afectacion",
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL eventos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json[\"html\"] }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        816,
+        -96
+      ],
+      "id": "01da2dbe-01d6-4826-adc1-528fabb8e232",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    'Eventos.DobleApertura' AS Origen, \n    DA.Anillo, \n    DA.Horario, \n    DA.HorarioFin, \n    DA.TiempoAfectacion, \n    inv.region, \n    inv.nombre_sitio,\n    DA.IR_SAP,\n    DA.Escalamiento\nFROM Eventos.DobleApertura AS DA  \nLEFT JOIN datos_red.inventario_equipos AS inv \n    ON inv.region_mst = SUBSTRING_INDEX(DA.Anillo, '_', 1)\nWHERE DA.IdAfectacion = '{{ $json.query.IdAfectacion }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        208,
+        -192
+      ],
+      "id": "d3ab0b5a-a4d4-4688-8c76-1298bfcb641f",
+      "name": "Consulta Eventos.DobleApertura",
+      "credentials": {
+        "mySql": {
+          "id": "BKiIWGM5T5ROjiot",
+          "name": "MySQL eventos"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        432,
+        -96
+      ],
+      "id": "ee78431b-8185-4680-b2e0-a2585510ceae",
+      "name": "Merge"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Consulta Eventos.Afectacion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Consulta Eventos.DobleApertura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PaginaWeb": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consulta Eventos.Afectacion": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Consulta Eventos.DobleApertura": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "PaginaWeb",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [],
+  "shared": [
+    {
+      "createdAt": "2025-09-24T19:03:22.243Z",
+      "updatedAt": "2025-09-24T19:03:22.243Z",
+      "role": "workflow:owner",
+      "workflowId": "wrIbGKpIaWXbciKm",
+      "projectId": "QdIaKjwyS02MMGZQ",
+      "project": {
+        "createdAt": "2025-09-11T18:03:44.820Z",
+        "updatedAt": "2025-09-11T18:10:14.443Z",
+        "id": "QdIaKjwyS02MMGZQ",
+        "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-09-11T18:03:44.820Z",
+            "updatedAt": "2025-09-11T18:03:44.820Z",
+            "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
+            "projectId": "QdIaKjwyS02MMGZQ",
+            "user": {
+              "createdAt": "2025-09-11T18:03:44.372Z",
+              "updatedAt": "2025-11-05T12:06:20.000Z",
+              "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
+              "email": "saf.empresas@claro.com.ar",
+              "firstName": "Soporte Acceso Empresas",
+              "lastName": " Empresas",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-11T18:11:25.739Z",
+                "personalization_survey_n8n_version": "1.110.1",
+                "automationGoalDevops": [
+                  "ticketing-systems-integrations"
+                ],
+                "companyIndustryExtended": [
+                  "telecoms"
+                ],
+                "companySize": "1000+",
+                "companyType": "other",
+                "role": "devops",
+                "reportedSource": "event"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "qNvPVx6pVl6SWob0",
+                "userActivatedAt": 1758135955025,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1759778484200
+                },
+                "easyAIWorkflowOnboarded": true
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-11-05",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "versionId": "467c0114-7d55-455a-9013-56974f8f11f9",
+  "triggerCount": 1,
+  "staticData": null,
+  "pinData": {}
+}
