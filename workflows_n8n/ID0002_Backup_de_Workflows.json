@@ -2,7 +2,7 @@
   "id": "YsKKJE5XbQ5ee7yk",
   "name": "ID0002_Backup de Workflows",
   "createdAt": "2025-10-31T14:14:31.902Z",
-  "updatedAt": "2025-11-05T12:29:19.000Z",
+  "updatedAt": "2025-11-06T17:08:18.000Z",
   "active": false,
   "isArchived": false,
   "nodes": [
@@ -19,8 +19,8 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        -480,
-        -48
+        -256,
+        -320
       ],
       "id": "e6da2fc0-d126-461b-a763-1551ba9085d4",
       "name": "Schedule Trigger"
@@ -73,8 +73,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -272,
-        -48
+        -96,
+        -320
       ],
       "id": "d047c0cc-5c56-47fa-a149-7f3359e6b9cd",
       "name": "Listar WF",
@@ -95,20 +95,20 @@
       "typeVersion": 1,
       "position": [
         -96,
-        -48
+        -64
       ],
       "id": "f82a040b-897f-47dc-b8a7-a7fbdeee538b",
       "name": "Separar"
     },
     {
       "parameters": {
-        "jsCode": "// items viene del Merge: cada item tiene un campo \"origen\" y \"name\"\n// Queremos emparejar por los primeros 6 caracteres del name\n\nconst output = [];\n\n// 1️⃣ Agrupamos por prefijo del nombre (primeros 6 caracteres)\nconst grupos = {};\nfor (const it of items) {\n  const origen = it.json.origen ?? \"desconocido\";\n  const name = it.json.name ?? \"\";\n  const key = name.slice(0, 6);\n\n  if (!key) continue;\n  if (!grupos[key]) grupos[key] = {};\n  grupos[key][origen] = it.json;\n}\n\n// 2️⃣ Procesamos cada grupo\nfor (const key of Object.keys(grupos)) {\n  const dbItem = grupos[key][\"db_n8n\"];\n  const ghItem = grupos[key][\"upload_github\"];\n\n  // ⚠️ Si falta el del n8n, no podemos generar backup\n  if (!dbItem) {\n    output.push({ json: { key, action: \"error\", reason: \"missing db_n8n item\" }});\n    continue;\n  }\n\n  const name = dbItem.name ?? ghItem?.name ?? key;\n  const filePath = dbItem.filePath ?? null;\n  const fileContent = dbItem.fileContent ?? null;\n  const commitMessage = dbItem.commitMessage ?? `Backup ${name}`;\n  const sha = ghItem?.sha ?? null;\n  const rawGitHub = ghItem?._rawGitHub ?? {};\n\n  if (!filePath || !fileContent) {\n    output.push({ json: { name, key, action: \"error\", reason: \"missing filePath or fileContent\" }});\n    continue;\n  }\n\n  // 🔐 Convertimos el contenido nuevo a base64\n  const contentBase64 = Buffer.from(fileContent).toString(\"base64\");\n\n  // 🧠 Lógica de acción\n  let action = \"update\";\n  let reason = null;\n\n  const ghStatus = rawGitHub.statusCode ?? null;\n  const ghContentBase64 = rawGitHub.content ?? null;\n\n  if (!sha && (ghStatus === 404 || ghStatus === null)) {\n    action = \"create\";\n  } else if (!sha && ghStatus && ghStatus !== 404) {\n    action = \"error\";\n    reason = `Unexpected GitHub status: ${ghStatus}`;\n  } else if (sha && ghContentBase64) {\n    try {\n      const remoteClean = ghContentBase64.replace(/\\n/g, \"\");\n      if (remoteClean === contentBase64) {\n        action = \"skip\";\n      } else {\n        action = \"update\";\n      }\n    } catch {\n      action = \"update\";\n    }\n  } else {\n    action = \"update\";\n  }\n\n  output.push({\n    json: {\n      key,\n      name,\n      filePath,\n      fileContent,\n      contentBase64,\n      commitMessage,\n      branch: dbItem.branch ?? \"main\",\n      sha,\n      action,\n      reason,\n      origen_db: \"db_n8n\",\n      origen_github: ghItem ? \"upload_github\" : null,\n      _rawGitHub: rawGitHub\n    }\n  });\n}\n\nreturn output;\n"
+        "jsCode": "// items viene del Merge: cada item tiene un campo \"origen\" y \"name\"\n// Emparejamos por los primeros 6 caracteres del name (ej: \"ID0009\")\n\nconst output = [];\n\n// 1️⃣ Agrupamos por prefijo del nombre (primeros 6 caracteres)\nconst grupos = {};\nfor (const it of items) {\n  const origen = it.json.origen ?? \"desconocido\";\n  const name = it.json.name ?? \"\";\n  const key = name.slice(0, 6);\n\n  if (!key) continue;\n  if (!grupos[key]) grupos[key] = {};\n  grupos[key][origen] = it.json;\n}\n\n// 2️⃣ Procesamos cada grupo\nfor (const key of Object.keys(grupos)) {\n  const dbItem = grupos[key][\"db_n8n\"];\n  const ghItem = grupos[key][\"upload_github\"];\n\n  // ⚠️ Si falta el del n8n, no podemos generar backup\n  if (!dbItem) {\n    output.push({ json: { key, action: \"skip\", name: ghItem?.name ?? key, reason: \"missing db_n8n item\" }});\n    continue;\n  }\n\n  const name = dbItem.name ?? ghItem?.name ?? key;\n  const filePath = dbItem.filePath ?? null;\n  const fileContent = dbItem.fileContent ?? null;\n  const commitMessage = dbItem.commitMessage ?? `Backup ${name}`;\n  const sha = ghItem?.sha ?? null;\n\n  // ⚙️ Validación del formato del key (debe ser ID + 4 dígitos)\n  const formatoValido = /^ID\\d{4}$/.test(key);\n  if (!formatoValido) {\n    output.push({\n      json: {\n        key,\n        name,\n        filePath,\n        fileContent,\n        commitMessage,\n        branch: dbItem.branch ?? \"main\",\n        sha,\n        action: \"skip\",\n        motivo_skip: \"nombre no cumple formato ID####\",\n        origen_db: \"db_n8n\",\n        origen_github: ghItem ? \"upload_github\" : null\n      }\n    });\n    continue;\n  }\n\n  // ⚠️ Si falta contenido o path, también saltamos\n  if (!filePath || !fileContent) {\n    output.push({\n      json: {\n        key,\n        name,\n        filePath,\n        action: \"skip\",\n        motivo_skip: \"missing filePath or fileContent\",\n        origen_db: \"db_n8n\",\n        origen_github: ghItem ? \"upload_github\" : null\n      }\n    });\n    continue;\n  }\n\n  // 🔐 Convertimos el contenido nuevo a base64\n  const contentBase64 = Buffer.from(fileContent).toString(\"base64\");\n\n  // 🧠 Lógica de acción: create / update / skip\n  let action = \"update\";\n\n  const ghStatus = ghItem?.statusCode ?? null;\n  const ghContentBase64 = ghItem?.content ?? null;\n\n  if (!sha && (ghStatus === 404 || ghStatus === null)) {\n    action = \"create\";\n  } else if (sha && ghContentBase64) {\n    try {\n      const remoteClean = ghContentBase64.replace(/\\n/g, \"\");\n      action = remoteClean === contentBase64 ? \"skip\" : \"update\";\n    } catch {\n      action = \"update\";\n    }\n  }\n\n  // 🧾 Agregamos al output final\n  output.push({\n    json: {\n      key,\n      name,\n      filePath,\n      fileContent,\n      contentBase64,\n      commitMessage,\n      branch: dbItem.branch ?? \"main\",\n      sha,\n      action,\n      origen_db: \"db_n8n\",\n      origen_github: ghItem ? \"upload_github\" : null\n    }\n  });\n}\n\nreturn output;\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        752,
-        -48
+        720,
+        -64
       ],
       "id": "c66c078f-54b4-4f55-ab84-5b49d8d22ae4",
       "name": "Preparar contenido y lógica de actualización"
@@ -152,7 +152,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        352,
+        336,
         -144
       ],
       "id": "8bb9d3e1-e39a-41a9-9614-4f8ff36e81f8",
@@ -165,7 +165,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        352,
+        336,
         32
       ],
       "id": "52507aa8-81f6-46e3-ac51-8b8866b550f0",
@@ -176,8 +176,8 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        560,
-        -48
+        544,
+        -64
       ],
       "id": "d724128f-a558-46c9-b495-ff4d01a6a939",
       "name": "Merge"
@@ -207,8 +207,8 @@
       "type": "n8n-nodes-base.github",
       "typeVersion": 1.1,
       "position": [
-        1232,
-        -224
+        1152,
+        -256
       ],
       "id": "db5d7b96-634d-4895-9afa-a511ee7f3be8",
       "name": "Crear",
@@ -223,7 +223,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "=https://api.github.com/repos/{{ $json.owner }}/{{ $json.repository }}/contents/{{ $json.filePath }}",
+        "url": "=https://api.github.com/repos/TelcoSae/adaptative_card/contents/{{ $json.filePath }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendHeaders": true,
@@ -237,13 +237,13 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"message\": \"{{ $json.commitMessage }}\",\n  \"content\": \"{{ $json.content }}\",\n  \"branch\": \"{{ $json.branch }}\",\n  \"sha\": \"{{ $json.sha }}\"\n}",
+        "jsonBody": "={\n  \"message\": \"{{ $json.commitMessage }}\",\n  \"content\": \"{{ $json.contentBase64 }}\",\n  \"branch\": \"{{ $json.branch }}\",\n  \"sha\": \"{{ $json.sha }}\"\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1408,
+        1840,
         -48
       ],
       "id": "5b7ea55c-0f67-4454-bcae-a38b7b980aa3",
@@ -258,12 +258,12 @@
     },
     {
       "parameters": {
-        "jsCode": "return items.map(item => {\n  const fileContent = item.json.fileContent;\n\n  // Validar que el contenido exista\n  if (!fileContent) {\n    throw new Error(\"fileContent está vacío o indefinido\");\n  }\n\n  // Codificar en base64\n  const contentBase64 = Buffer.from(fileContent).toString('base64');\n\n  return {\n    json: {\n      ...item.json,\n      content: contentBase64\n    }\n  };\n});"
+        "jsCode": "// ==============================\n// NODO CODE: \"Prepara el content\"\n// ==============================\n//\n// Objetivo: unir info del update con la última versión de SHA proveniente del upload_github,\n// asegurar que el contenido esté codificado en base64,\n// generar un commit message claro y homogéneo,\n// y preparar cada item para el nodo HTTP PUT.\n//\n// Entrada esperada: Merge con orígenes [\"update\", \"upload_github\"]\n// Salida: items listos para el PUT\n//\n\nconst output = [];\n\n// Filtramos por origen\nconst updates = items.filter(it => it.json.origen === \"update\");\nconst githubs = items.filter(it => it.json.origen === \"upload_github\");\n\n// Construimos índice de SHA más reciente\nconst indexGitHub = {};\nfor (const gh of githubs) {\n  const key = gh.json.key;\n  if (key && gh.json.sha) {\n    indexGitHub[key] = gh.json.sha;\n  }\n}\n\n// Recorremos todos los updates\nfor (const upd of updates) {\n  const data = { ...upd.json };\n  const key = data.key;\n\n  // 🔹 1. Aplicar SHA más reciente (si existe)\n  if (key && indexGitHub[key]) {\n    data.sha = indexGitHub[key];\n  }\n\n  // 🔹 2. Validar contenido y generar base64 si no está\n  if (!data.contentBase64) {\n    if (data.fileContent) {\n      data.contentBase64 = Buffer.from(data.fileContent).toString(\"base64\");\n    } else {\n      // si no hay contenido, marcar para saltar\n      data.action = \"skip\";\n      data.motivo_skip = \"Falta fileContent\";\n      output.push({ json: data });\n      continue;\n    }\n  }\n\n  // 🔹 3. Generar commitMessage claro y uniforme\n  const dateStr = new Date().toISOString().slice(0, 10);\n  data.commitMessage = data.commitMessage ||\n    `Backup workflow: ${data.name} (${data.key}) - ${dateStr}`;\n\n  // 🔹 4. Asegurar branch y filePath\n  data.branch = data.branch || \"main\";\n  if (!data.filePath && data.name) {\n    data.filePath = `workflows_n8n/${data.name}`;\n  }\n\n  // 🔹 5. Confirmar campos finales obligatorios\n  const required = [\"key\", \"name\", \"sha\", \"filePath\", \"contentBase64\"];\n  const missing = required.filter(f => !data[f]);\n  if (missing.length > 0) {\n    data.action = \"skip\";\n    data.motivo_skip = `Campos faltantes: ${missing.join(\", \")}`;\n  } else {\n    data.action = \"update\";\n  }\n\n  // 🔹 6. Mantener trazabilidad\n  data.origen_final = \"prepara_content\";\n\n  // 🔹 7. Agregar a salida final\n  output.push({ json: data });\n}\n\nreturn output;\n\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1232,
+        1664,
         -48
       ],
       "id": "19f65d9f-0eca-431d-b2fc-a5ad5eac57ae",
@@ -354,11 +354,93 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        976,
-        -64
+        912,
+        -80
       ],
       "id": "77abc05b-96a3-4830-a767-250a6ee801e4",
       "name": "Switch"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/TelcoSae/adaptative_card/contents/workflows_n8n/{{ $json.name.replace(/[^a-zA-Z0-9_\\-]/g, \"_\") }}.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1152,
+        128
+      ],
+      "id": "df583c9e-7054-4ced-a2d6-c17d9230d0da",
+      "name": "HTTP Get1",
+      "credentials": {
+        "githubApi": {
+          "id": "tDRbgWshuhl8EEiB",
+          "name": "GitHub account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items\n  // filtramos solo los que tengan name y sha válidos\n  .filter(item => item.json && item.json.name && item.json.sha)\n  // generamos los nuevos campos\n  .map(item => {\n    const name = item.json.name;\n    const sha = item.json.sha;\n\n    // Buscar \"ID\" seguido de 4 dígitos (por ejemplo ID0009)\n    const match = name.match(/ID\\d{4}/);\n    const key = match ? match[0] : null; // si no lo encuentra, null\n\n    return {\n      json: {\n        origen: \"upload_github\",\n        name,\n        sha,\n        key\n      }\n    };\n  });\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        128
+      ],
+      "id": "d7b530c2-5150-45c3-bc34-f53638b60dc0",
+      "name": "Extrae nombre+sha1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1504,
+        -48
+      ],
+      "id": "ff5de8bb-60d0-4de7-83cb-e5674a9e6985",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  return {\n    json: {\n      ...item.json,\n      origen: \"update\"\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        -64
+      ],
+      "id": "3dd84960-d166-43e2-836a-683ac64935ec",
+      "name": "Marca update"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const j = item.json || {};\n  const err = j.error || {};\n  const reason = err.description || err.message || \"Unknown error\";\n\n  // Extraer los SHA del mensaje tipo:\n  // \"is at 08b561f7... but expected c9c1443d...\"\n  let shaRemote = null;\n  let shaExpected = null;\n\n  const match = reason.match(/is at ([a-f0-9]+) .* expected ([a-f0-9]+)/i);\n  if (match) {\n    shaRemote = match[1];\n    shaExpected = match[2];\n  }\n\n  const now = new Date().toISOString();\n\n  return {\n    json: {\n      key: j.key || null,\n      name: j.name || null,\n      filePath: j.filePath || null,\n      status: \"resync_needed\",\n      reason: reason,\n      sha_prev: j.sha || null,\n      sha_remote: shaRemote,\n      sha_expected: shaExpected,\n      origen: \"update_conflict\",\n      conflictDetectedAt: now\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        176
+      ],
+      "id": "15cf3ea6-bea5-4c06-929a-6453f449ea95",
+      "name": "Analiza errores"
     }
   ],
   "connections": {
@@ -468,7 +550,14 @@
     },
     "Actualizar": {
       "main": [
-        []
+        [],
+        [
+          {
+            "node": "Analiza errores",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Prepara el content": {
@@ -493,7 +582,56 @@
         ],
         [
           {
+            "node": "HTTP Get1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Marca update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Get1": {
+      "main": [
+        [
+          {
+            "node": "Extrae nombre+sha1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrae nombre+sha1": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
             "node": "Prepara el content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marca update": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
             "type": "main",
             "index": 0
           }
@@ -531,7 +669,7 @@
             "projectId": "QdIaKjwyS02MMGZQ",
             "user": {
               "createdAt": "2025-09-11T18:03:44.372Z",
-              "updatedAt": "2025-11-05T12:06:20.000Z",
+              "updatedAt": "2025-11-06T12:53:50.000Z",
               "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
               "email": "saf.empresas@claro.com.ar",
               "firstName": "Soporte Acceso Empresas",
@@ -563,7 +701,7 @@
               },
               "disabled": false,
               "mfaEnabled": false,
-              "lastActiveAt": "2025-11-05",
+              "lastActiveAt": "2025-11-06",
               "isPending": false
             }
           }
@@ -571,7 +709,7 @@
       }
     }
   ],
-  "versionId": "80995efe-8628-45b6-8719-bb8ade8941e0",
+  "versionId": "c949ddbf-e4bc-40b5-b994-c5dc1739288c",
   "triggerCount": 1,
   "staticData": {
     "node:Schedule Trigger": {
