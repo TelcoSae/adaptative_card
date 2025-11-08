@@ -82,7 +82,7 @@
             "projectId": "QdIaKjwyS02MMGZQ",
             "user": {
               "createdAt": "2025-09-11T18:03:44.372Z",
-              "updatedAt": "2025-11-06T12:53:50.000Z",
+              "updatedAt": "2025-11-08T10:00:47.000Z",
               "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
               "email": "saf.empresas@claro.com.ar",
               "firstName": "Soporte Acceso Empresas",
@@ -114,7 +114,7 @@
               },
               "disabled": false,
               "mfaEnabled": false,
-              "lastActiveAt": "2025-11-06",
+              "lastActiveAt": "2025-11-08",
               "isPending": false
             }
           }
