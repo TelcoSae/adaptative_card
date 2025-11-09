@@ -2,8 +2,8 @@
   "id": "YsKKJE5XbQ5ee7yk",
   "name": "ID0002_Backup de Workflows",
   "createdAt": "2025-10-31T14:14:31.902Z",
-  "updatedAt": "2025-11-06T17:08:18.000Z",
-  "active": false,
+  "updatedAt": "2025-11-07T12:15:10.000Z",
+  "active": true,
   "isArchived": false,
   "nodes": [
     {
@@ -431,16 +431,52 @@
     },
     {
       "parameters": {
-        "jsCode": "return items.map(item => {\n  const j = item.json || {};\n  const err = j.error || {};\n  const reason = err.description || err.message || \"Unknown error\";\n\n  // Extraer los SHA del mensaje tipo:\n  // \"is at 08b561f7... but expected c9c1443d...\"\n  let shaRemote = null;\n  let shaExpected = null;\n\n  const match = reason.match(/is at ([a-f0-9]+) .* expected ([a-f0-9]+)/i);\n  if (match) {\n    shaRemote = match[1];\n    shaExpected = match[2];\n  }\n\n  const now = new Date().toISOString();\n\n  return {\n    json: {\n      key: j.key || null,\n      name: j.name || null,\n      filePath: j.filePath || null,\n      status: \"resync_needed\",\n      reason: reason,\n      sha_prev: j.sha || null,\n      sha_remote: shaRemote,\n      sha_expected: shaExpected,\n      origen: \"update_conflict\",\n      conflictDetectedAt: now\n    }\n  };\n});\n"
+        "jsCode": "return items.map(item => {\n  const j = item.json || {};\n  const err = j.error || {};\n  const reason = err.description || err.message || \"Unknown error\";\n\n  // Extraer los SHA del mensaje tipo:\n  // \"is at 08b561f7... but expected c9c1443d...\"\n  let shaRemote = null;\n  let shaExpected = null;\n\n  const match = reason.match(/is at ([a-f0-9]+) .* expected ([a-f0-9]+)/i);\n  if (match) {\n    shaRemote = match[1];\n    shaExpected = match[2];\n  }\n\n  const now = new Date().toISOString();\n\n  // Generar nuevo commit message para el reintento\n  const commitMsg = `Re-sync workflow: ${j.name || \"unknown\"} (${j.key || \"-\"}) - ${now.slice(0, 10)}`;\n\n  return {\n    json: {\n      // --- análisis del error ---\n      key: j.key || null,\n      name: j.name || null,\n      filePath: j.filePath || null,\n      status: \"resync_needed\",\n      reason: reason,\n      sha_prev: j.sha || null,\n      sha_remote: shaRemote,\n      sha_expected: shaExpected,\n      origen: \"update_conflict\",\n      conflictDetectedAt: now,\n\n      // --- info para PUT reintento ---\n      ready_for_resync: !!shaRemote,\n      branch: j.branch || \"main\",\n      contentBase64: j.contentBase64 || null,\n      commitMessage: commitMsg,\n      sha: shaRemote || j.sha || null, // usar el SHA remoto si existe\n      message: commitMsg,\n      content: j.contentBase64 || null,\n\n      // --- datos originales preservados ---\n      origen_db: j.origen_db || null,\n      origen_github: j.origen_github || null,\n      origen_final: \"analiza_errores\"\n    }\n  };\n});\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         1840,
-        176
+        192
       ],
       "id": "15cf3ea6-bea5-4c06-929a-6453f449ea95",
       "name": "Analiza errores"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.github.com/repos/TelcoSae/adaptative_card/contents/{{ $json.filePath }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": \"{{ $json.commitMessage }}\",\n  \"content\": \"{{ $json.contentBase64 }}\",\n  \"branch\": \"{{ $json.branch }}\",\n  \"sha\": \"{{ $json.sha }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2032,
+        192
+      ],
+      "id": "0a613903-bb91-4686-8996-0466236a1fe0",
+      "name": "Actualizar retry",
+      "credentials": {
+        "githubApi": {
+          "id": "tDRbgWshuhl8EEiB",
+          "name": "GitHub account"
+        }
+      },
+      "onError": "continueErrorOutput"
     }
   ],
   "connections": {
@@ -637,6 +673,17 @@
           }
         ]
       ]
+    },
+    "Analiza errores": {
+      "main": [
+        [
+          {
+            "node": "Actualizar retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -669,7 +716,7 @@
             "projectId": "QdIaKjwyS02MMGZQ",
             "user": {
               "createdAt": "2025-09-11T18:03:44.372Z",
-              "updatedAt": "2025-11-06T12:53:50.000Z",
+              "updatedAt": "2025-11-09T10:00:47.000Z",
               "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
               "email": "saf.empresas@claro.com.ar",
               "firstName": "Soporte Acceso Empresas",
@@ -701,7 +748,7 @@
               },
               "disabled": false,
               "mfaEnabled": false,
-              "lastActiveAt": "2025-11-06",
+              "lastActiveAt": "2025-11-09",
               "isPending": false
             }
           }
@@ -709,7 +756,7 @@
       }
     }
   ],
-  "versionId": "c949ddbf-e4bc-40b5-b994-c5dc1739288c",
+  "versionId": "3e684373-6b05-489f-bd05-7407efbd250d",
   "triggerCount": 1,
   "staticData": {
     "node:Schedule Trigger": {
