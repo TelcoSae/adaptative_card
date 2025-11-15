@@ -1,0 +1,201 @@
+{
+  "id": "RCbDpbciJlML9M3N",
+  "name": "ID0012_HP_SYTEX_TP",
+  "createdAt": "2025-10-01T14:06:09.259Z",
+  "updatedAt": "2025-11-06T15:35:23.000Z",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Función para n8n - Transforma array en lista plana de tareas\nfunction transformWorkflowData(inputArray) {\n    const tareas = [];\n    \n    // Procesar cada item del input\n    inputArray.forEach(item => {\n        const tareaItem = {\n            wbs: item.wbs || '',\n            form: item.form || '',\n            tas: item.tas || '',\n            estado: item.estado || '',\n            prioridad: extractPrioridad(item.proyecto),\n            tipo: extractTipo(item.proyecto),\n            sitio: item.sitio || '',\n            fecha: item.fecha || '',\n            hora: extractHora(item.hora_de_plan_de_inicio, item.Hora_inicio),\n            id: item.id || '',\n            url: item.url || '',\n            contratista: item.contratista || '',\n            proyecto: item.proyecto || '',\n            tarea: sanitizeTarea(item.tarea),   // ✅ usar la función de limpieza aquí\n            ejecutante: item.ejecutante || '',\n            afecta_clientes: item.afecta_clientes || '',\n            \n            // Nuevo campo calculado\n            categoria: extractCategoria(item.ejecutante)\n        };\n        \n        tareas.push(tareaItem);\n    });\n    \n    return tareas; // Devuelve un array plano\n}\n\n// 🧹 Función auxiliar: reemplazar \"\\\" o caracteres de control como \\u000b por \"-\"\nfunction sanitizeTarea(tarea) {\n    if (!tarea) return '';\n    return tarea.replace(/[\\u000b\\\\]/g, '-');  // Reemplaza \\u000b y \"\\\" por guion\n}\n\n// Función auxiliar: Extraer prioridad del nombre del proyecto\nfunction extractPrioridad(proyecto) {\n    if (!proyecto) return '';\n    \n    const proyectoUpper = proyecto.toUpperCase();\n    \n    if (proyectoUpper.includes('EMERGENCIA')) {\n        return 'EMERGENCIA';\n    } else if (proyectoUpper.includes('NO CRÍTICO') || proyectoUpper.includes('NO CRITICO')) {\n        return 'NO CRÍTICO';\n    } else if (proyectoUpper.includes('CRÍTICO') || proyectoUpper.includes('CRITICO')) {\n        return 'CRÍTICO';\n    }\n    \n    return '';\n}\n\n// Función auxiliar: Determinar tipo según nombre del proyecto\nfunction extractTipo(proyecto) {\n    if (!proyecto) return 'Validación';\n    \n    if (proyecto.trim().toUpperCase().startsWith('SAE')) {\n        return 'Ejecución';\n    }\n    \n    return 'Validación';\n}\n\n// 🕒 Función auxiliar: Extraer hora según la nueva lógica\nfunction extractHora(horaPlanInicio, horaInicio) {\n    if (!horaPlanInicio) return '';\n\n    const valorPlan = horaPlanInicio.trim().toLowerCase();\n\n    // Caso 1: Si es \"Diurna\"\n    if (valorPlan === 'diurna') {\n        if (horaInicio && horaInicio.trim() !== '') {\n            return horaInicio.trim();\n        } else {\n            return 'Diurna';\n        }\n    }\n\n    // Caso 2: No es \"Diurna\" → intentar formatear a hh:mm hs.\n    const horaMatch = horaPlanInicio.match(/^(\\d{1,2}):(\\d{2})$/);\n    if (horaMatch) {\n        const [_, hh, mm] = horaMatch;\n        return `${hh.padStart(2, '0')}:${mm} hs.`;\n    }\n\n    return horaPlanInicio; // si no coincide el formato, se devuelve como vino\n}\n\n// 🚀 Nueva función auxiliar: Determinar categoría según el ejecutante\nfunction extractCategoria(ejecutante) {\n    if (!ejecutante || ejecutante.trim() === '') {\n        return 'Validación';\n    }\n\n    const ejecutanteTrim = ejecutante.trim();\n\n    if (ejecutanteTrim === 'Soporte Acceso Empresas - SAE') {\n        return 'SAE';\n    } else if (\n        ejecutanteTrim === 'Proveedor Externo' ||\n        ejecutanteTrim === 'Implementación de Servicios de Acceso - ISA'\n    ) {\n        return 'Terceros';\n    }\n\n    return '';\n}\n\n// ====================\n// CÓDIGO PARA n8n\n// ====================\n\nconst inputData = $input.all();\nlet dataArray = [];\n\nif (Array.isArray(inputData)) {\n    dataArray = inputData.map(item => item.json);\n} else if (inputData[0] && Array.isArray(inputData[0].json)) {\n    dataArray = inputData[0].json;\n} else if (inputData[0]) {\n    dataArray = [inputData[0].json];\n}\n\nconst tareas = transformWorkflowData(dataArray);\n\nconsole.log('=== TRANSFORMATION SUMMARY ===');\nconsole.log('Input items:', dataArray.length);\nconsole.log('Output tareas count:', tareas.length);\n\ntareas.forEach(tarea => {\n    console.log(`\\nWBS: ${tarea.wbs}`);\n    console.log(` TAS: ${tarea.tas}`);\n    console.log(` Prioridad: ${tarea.prioridad}`);\n    console.log(` Tipo: ${tarea.tipo}`);\n    console.log(` Categoría: ${tarea.categoria}`);\n    console.log(` Hora: ${tarea.hora}`);\n    console.log(` Tarea: ${tarea.tarea}`);\n});\n\nconsole.log('\\n=== END SUMMARY ===');\n\nreturn [{ json: { tareas: tareas } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -16
+      ],
+      "id": "520e7b74-ec6c-4f68-886e-223130203e9c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    ST.codigo_workflow AS wbs,\n    SF.codigo_formulario AS form,\n    ST.codigo_tarea AS tas,\n    ST.estado_tarea AS estado,\n    ST.codigo_sitio AS sitio,\n    ST.fecha_de_plan_de_inicio AS fecha,\n    ST.hora_de_plan_de_inicio AS hora_de_plan_de_inicio,\n    ST.id_tarea AS id,\n    ST.url_tarea AS url,\n    ST.nombre_del_contratista_asignado AS contratista,\n    ST.nombre_del_proyecto AS proyecto,\n\n    -- Pivot de respuestas\n    MAX(CASE WHEN SR.etiqueta_pregunta = 'Describa tarea a realizar:' THEN SR.valor_respuesta END) AS tarea,\n    MAX(CASE WHEN SR.etiqueta_pregunta = 'Indique Ejecutante' THEN SR.valor_respuesta END) AS ejecutante,\n    MAX(CASE WHEN SR.etiqueta_pregunta = '¿Afecta a Clientes Mercado Empresa?' THEN SR.valor_respuesta END) AS afecta_clientes,\n    MAX(CASE WHEN SR.etiqueta_pregunta = 'Hora de inicio:' THEN SR.valor_respuesta END) AS Hora_inicio\n\nFROM sytex_tareas AS ST\nLEFT JOIN sytex_formularios AS SF \n    ON SF.codigo_workflow = ST.codigo_workflow\nLEFT JOIN sytex_respuestas AS SR\n    ON SR.codigo_formulario = SF.codigo_formulario\n    AND SR.etiqueta_pregunta IN ('Describa tarea a realizar:', 'Indique Ejecutante', '¿Afecta a Clientes Mercado Empresa?', 'Hora de inicio:')\n\nWHERE ST.estado_tarea = 'Abierta'\n  AND ST.fecha_de_plan_de_inicio = DATE_ADD(CURDATE(), INTERVAL 1 DAY)\n\nGROUP BY \n    ST.codigo_workflow,\n    SF.codigo_formulario,\n    ST.codigo_tarea,\n    ST.estado_tarea,\n    ST.codigo_sitio,\n    ST.fecha_de_plan_de_inicio,\n    ST.hora_de_plan_de_inicio,\n    ST.id_tarea,\n    ST.url_tarea,\n    ST.nombre_del_proyecto,\n    ST.nombre_del_contratista_asignado;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        -384,
+        -16
+      ],
+      "id": "6dfb6c9e-ed39-4025-9207-8eed7fb6f4f9",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "mySql": {
+          "id": "uNW6TD2qlwo9AR01",
+          "name": "MySQL crm"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://f3da3763bda6e539974bcb2bd9bcbe.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/34a18259c54e4cedbb001c23a8490022/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=dub65Uve1S1EKqBJW5_wCZrgCqSKlCMbbvLTNL8Kcfk",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tareas",
+              "value": "={{ $json.tareas }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        96,
+        -16
+      ],
+      "id": "56dfca14-3650-482a-9b11-847840165db7",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 30 8,12,20 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -624,
+        -16
+      ],
+      "id": "380b5ede-a5de-448c-a418-c230cd467812",
+      "name": "Schedule Trigger"
+    }
+  ],
+  "connections": {
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2025-10-01T14:06:09.263Z",
+      "createdAt": "2025-10-01T14:06:09.263Z",
+      "role": "workflow:owner",
+      "workflowId": "RCbDpbciJlML9M3N",
+      "projectId": "QdIaKjwyS02MMGZQ",
+      "project": {
+        "updatedAt": "2025-09-11T18:10:14.443Z",
+        "createdAt": "2025-09-11T18:03:44.820Z",
+        "id": "QdIaKjwyS02MMGZQ",
+        "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "updatedAt": "2025-09-11T18:03:44.820Z",
+            "createdAt": "2025-09-11T18:03:44.820Z",
+            "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
+            "projectId": "QdIaKjwyS02MMGZQ",
+            "user": {
+              "updatedAt": "2025-11-15T10:00:04.000Z",
+              "createdAt": "2025-09-11T18:03:44.372Z",
+              "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
+              "email": "saf.empresas@claro.com.ar",
+              "firstName": "Soporte Acceso Empresas",
+              "lastName": " Empresas",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-11T18:11:25.739Z",
+                "personalization_survey_n8n_version": "1.110.1",
+                "automationGoalDevops": [
+                  "ticketing-systems-integrations"
+                ],
+                "companyIndustryExtended": [
+                  "telecoms"
+                ],
+                "companySize": "1000+",
+                "companyType": "other",
+                "role": "devops",
+                "reportedSource": "event"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "qNvPVx6pVl6SWob0",
+                "userActivatedAt": 1758135955025,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1759778484200
+                },
+                "easyAIWorkflowOnboarded": true
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-11-15",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "versionId": "dc1066f2-03e2-49c2-9b14-c813470dc1cd",
+  "triggerCount": 1,
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    }
+  },
+  "pinData": {}
+}
