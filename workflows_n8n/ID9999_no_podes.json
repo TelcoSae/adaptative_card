@@ -124,14 +124,14 @@
   "tags": [],
   "shared": [
     {
-      "createdAt": "2025-09-25T18:43:32.874Z",
       "updatedAt": "2025-09-25T18:43:32.874Z",
+      "createdAt": "2025-09-25T18:43:32.874Z",
       "role": "workflow:owner",
       "workflowId": "xd6nWnJqp45P9bFT",
       "projectId": "QdIaKjwyS02MMGZQ",
       "project": {
-        "createdAt": "2025-09-11T18:03:44.820Z",
         "updatedAt": "2025-09-11T18:10:14.443Z",
+        "createdAt": "2025-09-11T18:03:44.820Z",
         "id": "QdIaKjwyS02MMGZQ",
         "name": "Soporte Acceso Empresas  Empresas <saf.empresas@claro.com.ar>",
         "type": "personal",
@@ -139,13 +139,13 @@
         "description": null,
         "projectRelations": [
           {
-            "createdAt": "2025-09-11T18:03:44.820Z",
             "updatedAt": "2025-09-11T18:03:44.820Z",
+            "createdAt": "2025-09-11T18:03:44.820Z",
             "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
             "projectId": "QdIaKjwyS02MMGZQ",
             "user": {
+              "updatedAt": "2025-11-24T10:00:04.000Z",
               "createdAt": "2025-09-11T18:03:44.372Z",
-              "updatedAt": "2025-11-05T12:06:20.000Z",
               "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
               "email": "saf.empresas@claro.com.ar",
               "firstName": "Soporte Acceso Empresas",
@@ -177,7 +177,7 @@
               },
               "disabled": false,
               "mfaEnabled": false,
-              "lastActiveAt": "2025-11-05",
+              "lastActiveAt": "2025-11-24",
               "isPending": false
             }
           }
