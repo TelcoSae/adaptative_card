@@ -2,7 +2,7 @@
   "id": "2vfILabl4eRvb46K",
   "name": "ID0005_Notificación de Afectación - Apertura",
   "createdAt": "2025-10-03T20:15:37.699Z",
-  "updatedAt": "2025-12-04T18:27:26.000Z",
+  "updatedAt": "2025-12-05T13:07:12.000Z",
   "active": false,
   "isArchived": false,
   "nodes": [
@@ -80,7 +80,13 @@
   "connections": {
     "Execute a SQL query": {
       "main": [
-        []
+        [
+          {
+            "node": "Aviso a CGE",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "When Executed by Another Workflow": {
@@ -124,7 +130,7 @@
             "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
             "projectId": "QdIaKjwyS02MMGZQ",
             "user": {
-              "updatedAt": "2025-12-05T10:00:04.000Z",
+              "updatedAt": "2025-12-10T10:00:04.000Z",
               "createdAt": "2025-09-11T18:03:44.372Z",
               "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
               "email": "saf.empresas@claro.com.ar",
@@ -157,7 +163,7 @@
               },
               "disabled": false,
               "mfaEnabled": false,
-              "lastActiveAt": "2025-12-05",
+              "lastActiveAt": "2025-12-10",
               "isPending": false
             }
           }
@@ -165,7 +171,7 @@
       }
     }
   ],
-  "versionId": "a06be88f-0b26-41a0-af99-d5892bd6ab1c",
+  "versionId": "a07a6ffc-db5d-487f-bdda-06b92e094bd1",
   "triggerCount": 0,
   "staticData": null,
   "pinData": {}
