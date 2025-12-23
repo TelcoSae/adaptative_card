@@ -2,19 +2,20 @@
   "id": "EcF5TTa5aRCmTcis",
   "name": "ID0004_Notificación de Afectación - Finalización",
   "createdAt": "2025-10-06T19:18:58.281Z",
-  "updatedAt": "2025-11-03T16:35:24.000Z",
+  "updatedAt": "2025-12-16T19:42:23.000Z",
   "active": true,
   "isArchived": false,
   "nodes": [
     {
       "parameters": {
         "path": "60627cdc-9eb1-43c4-bfef-0eddc4f6c2ba",
+        "responseMode": "responseNode",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        160,
+        -96,
         240
       ],
       "id": "5863f14c-5ae2-4a09-9c9c-3dce6a913c0a",
@@ -33,7 +34,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        768,
+        640,
         240
       ],
       "id": "9e3d52f5-0a23-40f3-8fd4-e6726ca043ea",
@@ -51,8 +52,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        768,
-        448
+        640,
+        432
       ],
       "id": "1cbedd20-3a74-4e73-b423-0bd4243b4533",
       "name": "Cierre StaffME"
@@ -64,7 +65,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        544,
+        384,
         240
       ],
       "id": "876be80d-b73e-41f9-8eaf-a17978267090",
@@ -79,7 +80,7 @@
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.5,
       "position": [
-        352,
+        96,
         240
       ],
       "id": "519779af-3b06-4026-b32d-c6acbe227190",
@@ -90,6 +91,44 @@
           "name": "MySQL eventos"
         }
       }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json[\"html\"] }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        640,
+        64
+      ],
+      "id": "37245375-3133-49dc-86f1-7e3ff264a8f0",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ev = $json;\n\n// Helpers\nfunction formatTiempo(segundos) {\n  if (!segundos || isNaN(segundos)) return \"—\";\n  const h = Math.floor(segundos / 3600);\n  const m = Math.floor((segundos % 3600) / 60);\n  const s = segundos % 60;\n  return `${h}h ${m.toString().padStart(2,'0')}m ${s.toString().padStart(2,'0')}s`;\n}\n\nconst html = `\n<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Evento Finalizado - ${ev.Anillo}</title>\n<style>\n  * { box-sizing: border-box; }\n  body {\n    margin: 0;\n    padding: 20px;\n    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n    background: #000000;\n    color: #f0f0f0;\n  }\n  .container {\n    max-width: 1100px;\n    margin: 0 auto;\n  }\n  header {\n    margin-bottom: 28px;\n  }\n  h1 {\n    font-size: 26px;\n    font-weight: 700;\n    margin: 0;\n    color: #ffffff;\n  }\n  .sub {\n    margin-top: 6px;\n    color: #aaaaaa;\n    font-size: 16px;\n  }\n\n  .status {\n    margin-top: 12px;\n    display: inline-block;\n    padding: 6px 14px;\n    background: #14532d;\n    color: #4ade80;\n    border-radius: 999px;\n    font-size: 13px;\n    font-weight: 600;\n  }\n\n  .cards {\n    display: flex;\n    flex-wrap: wrap;\n    gap: 16px;\n    margin-top: 30px;\n  }\n  .card {\n    flex: 1;\n    min-width: 220px;\n    background: #1e1e1e;\n    border-radius: 14px;\n    padding: 20px;\n    box-shadow: 0 4px 12px rgba(0,0,0,0.6);\n  }\n  .card-title {\n    font-size: 12px;\n    text-transform: uppercase;\n    letter-spacing: 0.7px;\n    color: #aaaaaa;\n    margin-bottom: 10px;\n  }\n  .card-value {\n    font-size: 20px;\n    font-weight: 700;\n    color: #ffffff;\n  }\n\n  .card-value.green { color: #4ade80; }\n  .card-value.blue { color: #60a5fa; }\n\n  footer {\n    margin-top: 36px;\n    text-align: center;\n    font-size: 12px;\n    color: #777;\n  }\n</style>\n</head>\n\n<body>\n<div class=\"container\">\n\n  <header>\n    <h1>Evento Finalizado</h1>\n    <div class=\"sub\">\n      Afectación Masivas Empresas · ${ev.region} · ${ev.nombre_sitio}\n    </div>\n    <div class=\"status\">✔ INFORMADO</div>\n  </header>\n\n  <div class=\"cards\">\n    <div class=\"card\">\n      <div class=\"card-title\">Anillo</div>\n      <div class=\"card-value\">${ev.Anillo}</div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-title\">Inicio</div>\n      <div class=\"card-value\">${ev.Horario}</div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-title\">Finalización</div>\n      <div class=\"card-value green\">${ev.HorarioFin}</div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-title\">Tiempo de Afectación</div>\n      <div class=\"card-value blue\">${formatTiempo(ev.TiempoAfectacion)}</div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-title\">Equipos</div>\n      <div class=\"card-value\">${ev.Equipos}</div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-title\">Servicios</div>\n      <div class=\"card-value\">${ev.Servicios}</div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-title\">Clientes</div>\n      <div class=\"card-value\">${ev.Clientes}</div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-title\">IR SAP</div>\n      <div class=\"card-value\">${ev.IR_SAP}</div>\n    </div>\n  </div>\n\n  <footer>\n    Evento informado automáticamente por el sistema de monitoreo\n    <br>ID Afectación: ${ev.IdAfectacion}\n  </footer>\n\n</div>\n</body>\n</html>\n`;\n\nreturn [\n  {\n    json: {\n      canal: \"Afectación Masivas Empresas\",\n      tipo: \"Cierre de Evento\",\n      html\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        64
+      ],
+      "id": "fe0b9362-bcf1-4bff-872f-684caac679c4",
+      "name": "Html"
     }
   ],
   "connections": {
@@ -106,13 +145,7 @@
     },
     "Normaliza": {
       "main": [
-        [
-          {
-            "node": "Cierre CGE",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Doble Apertura": {
@@ -120,6 +153,22 @@
         [
           {
             "node": "Normaliza",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Html": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
             "type": "main",
             "index": 0
           }
@@ -156,7 +205,7 @@
             "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
             "projectId": "QdIaKjwyS02MMGZQ",
             "user": {
-              "updatedAt": "2025-11-28T10:00:04.000Z",
+              "updatedAt": "2025-12-23T10:00:04.000Z",
               "createdAt": "2025-09-11T18:03:44.372Z",
               "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
               "email": "saf.empresas@claro.com.ar",
@@ -189,7 +238,7 @@
               },
               "disabled": false,
               "mfaEnabled": false,
-              "lastActiveAt": "2025-11-28",
+              "lastActiveAt": "2025-12-23",
               "isPending": false
             }
           }
@@ -197,7 +246,7 @@
       }
     }
   ],
-  "versionId": "6708fee4-a525-480f-9b2e-5f4a14755bc7",
+  "versionId": "5607d51d-ea89-4f2a-a71c-fbec7dd4842e",
   "triggerCount": 1,
   "staticData": null,
   "pinData": {}
