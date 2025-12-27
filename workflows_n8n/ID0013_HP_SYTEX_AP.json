@@ -140,7 +140,7 @@
             "userId": "4facc838-fc29-4888-93e5-fd2ef787b161",
             "projectId": "QdIaKjwyS02MMGZQ",
             "user": {
-              "updatedAt": "2025-12-26T10:00:04.000Z",
+              "updatedAt": "2025-12-27T10:00:04.000Z",
               "createdAt": "2025-09-11T18:03:44.372Z",
               "id": "4facc838-fc29-4888-93e5-fd2ef787b161",
               "email": "saf.empresas@claro.com.ar",
@@ -173,7 +173,7 @@
               },
               "disabled": false,
               "mfaEnabled": false,
-              "lastActiveAt": "2025-12-26",
+              "lastActiveAt": "2025-12-27",
               "isPending": false
             }
           }
